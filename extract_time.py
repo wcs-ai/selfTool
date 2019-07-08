@@ -8,6 +8,7 @@ year = h_date.year
 month = h_date.month
 day = h_date.day
 
+#春夏秋冬
 #分级：年/5,月/4，日/3，时/2，分/1，秒/0
 time_words = ['今年','明年','去年','前年','昨天','今天','前天','明天','后天','早上','中午','晚上','傍晚','今早']
 reg = {
@@ -77,17 +78,19 @@ def extract(data):
 def tran_num(sen):
     string = sen
     china_num = ['零','一','二','三','四','五','六','七','八','九','十']
-    a_num = [0,1,2,3,4,5,6,7,8,9,'']
+    a_num = ['0','1','2','3','4','5','6','7','8','9','']
     for i in range(len(china_num)):
         if china_num[i]!='十':
             string.replace(china_num[i],a_num[i])
         else:
             #十的替换比较特殊
             ord = string.find('十')
-            if string[ord+1] in china_num:
+            if string[ord+1] in china_num and string[ord-1] in china_num:
                 string.replace('十','')
+            elif string[ord-1] not in china_num and string[ord+1] in china_num:
+                string.replace('十','1')
             else:
-                string.replace('十',0)
+                string.replace('十','0')
 
     return string
 
@@ -103,25 +106,53 @@ def word_to_time(sentence):
     ys1 = re.search(reg['y1'], sentence)
     ys2 = re.search(reg['y2'], sentence)
     ms = re.search(reg['m'], sentence)
+    ds1 = re.search(reg['d1'], sentence)
+    ds2 = re.search(reg['d2'], sentence)
+    hs2 = re.search(reg['h2'], sentence)
 
+#备注：未对个数年月日处理，如19年，55年等缩写简写。把检测到的带年，月，日等字去掉
     if ys1!=None:
-        if(ys1[1]=='前年'):
+        if(ys1.group()=='前年'):
             r_y = year - 2
-        elif ys1[1]=='去年':
+        elif ys1.group()=='去年':
             r_y = year - 1
-        elif ys1[1]=='明年':
+        elif ys1.group()=='明年':
             r_y = year + 1
     elif ys2!=None:
-        r_y = tran_num(ys2[1])
-        pass
+        r_y = tran_num(ys2.group())
     else:
         r_y = year
 
     #月份检测
     if ms!=None:
-        r_m = tran_num(ms[1])
+        r_m = tran_num(ms.group())
+    else:
+        r_m = month
+
+    #check day
+    if ds1!=None:
+        if ds1.group() == '前天':
+            r_d = day - 2
+        elif ds1.group() == '昨天':
+            r_d = day - 1
+        elif ds1.group() == '明天':
+            r_d = day + 1
+        else:
+            r_d = day
+    elif ds2!=None:
+        r_d = tran_num(ds2.group())
+    else:
+        r_d = day
+
+    #check hour
+    if hs2!=None:
+        r_h = tran_num(hs2.group())
+    else:
+        r_h = ''
 
 
-    return r_y+r_m+r_d+r_h+r_min
+
+
+    return str(r_y)+'-'+str(r_m)+'-'+str(r_d)+'-'+(r_h)+'-'+str(r_min)
 
 
