@@ -5,6 +5,7 @@ from SELF_TOOLS import common
 
 words_list = []
 words_obj = {}
+file_words = []
 #读取英文文本,参数：文件路径列表
 def read_en_txt(sequence,coding):
     global words_list,words_obj
@@ -23,6 +24,7 @@ def read_en_txt(sequence,coding):
             for c in en_stop:
                 f1 = f1.replace(c,'')
             f2 = f1.lower().replace('<br />','').split()
+            file_words.append(f2)
             for word in f2:
                 if word in words_list:
                     pass
@@ -34,8 +36,6 @@ def read_en_txt(sequence,coding):
                 else:
                     words_obj[word] = 1
         q += 1
-
-    return words_list,words_obj
 
 
 def en_read(arr,coding,num):
@@ -52,6 +52,10 @@ def en_read(arr,coding,num):
     q_data = datas.get()
     read_en_txt(q_data,coding)
 
+#使用get获取解析的值
 def get():
     common.stop_thread()
-    return words_list,words_obj
+    return words_list,words_obj,file_words
+
+
+
