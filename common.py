@@ -38,3 +38,6 @@ def get_all_files(path):
     get_file(path)
     #返回的是所有文件的路径
     return files
+
+
+

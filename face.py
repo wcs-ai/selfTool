@@ -1,7 +1,7 @@
 import numpy as np
 from SELF_TOOLS import common
 import cv2
-from PIL import Image
+import scipy
 
 class discern_face(object):
     def __init__(self,imgs,haar_path):
@@ -20,15 +20,25 @@ class discern_face(object):
             faces = face_descade.detectMultiScale(img_gray,1.3,5)
             coordinates.append(faces)
         return coordinates
-    #get face data
-    def get_face_data(self):
+    #get face data,arguments:output img size
+    def get_face_data(self,size,batch=0):
         cds = self.find_face_coordinate()
-
-        print(self.imgs[0].shape)
+        batch_arr = []
+        i = 1
+        #获取人脸部位数据，并统一大小
         for item,img in zip(cds,self.imgs):
-            image = Image.re
-            self.face_data.append(img[item[1]:item[1]+item[3],item[0]:item[0]+item[2]])
-        return self.face_data
+            image = img[item[1]:item[1]+item[3],item[0]:item[0]+item[2]]
+            image_resize = cv2.resize(np.array(image),size,fx=0.25,fy=0.25,interpolation=cv2.INTER_AREA)
+            batch_arr.append(image_resize)
+            #如果batch为0就不当成迭代对象使用
+            if batch==0:
+                if i % batch == 0 or len(self.imgs) <= i:
+                    yield batch_arr
+            else:
+                self.face_data.append(image_resize)
+            i += 1
+        #return self.face_data
     def save_face_data(self,path):
-        np.save(path)
+        np.save(path,self.face_data)
+
 
