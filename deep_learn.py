@@ -34,11 +34,20 @@ class CNN(object):
     def avage_pool(self,img,ksize=[1,3,3,1],stride=[1,2,2,1],PADDING='SAME'):
         pool = tf.nn.avg_pool(img,ksize=ksize,strides=stride,padding=PADDING)
         return pool
+    #返回最大池化结果和，最大值位置
+    def max_pool(self,img,ksize,stride=[1,2,2,1],PADDING='SAME'):
+        _a,mask = tf.nn.max_pool_with_argmax(img,ksize=ksize,strides=stride,padding=PADDING)
+        mask = tf.stop_gradient(mask)
+        res = tf.nn.max_pool(img,ksize=ksize,strides=stride,padding=PADDING)
+        return res,mask
     def struct_model(self,img,training):
+        image = img
         with tf.device('/gpu:0'):
             for i in range(len(self.bas)):
-                self.convole_layers[i] = self.conv2d(img,self.wts[i],self.bas[i],training=training)
-                self.pool_layers[i] = 1
+
+                self.convole_layers[i] = self.conv2d(image,self.wts[i],self.bas[i],training=training)
+                self.pool_layers[i] = self.max_pool(image,[1,2,2,1])
+                image = self.convole_layers[i]
 
 
 class RNN(object):

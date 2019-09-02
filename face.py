@@ -10,6 +10,8 @@ class discern_face(object):
         self.imgs = []
         self.face_data = []
         self.haar_file = haar_path
+        #检测失败的图片
+        self.err_face = []
     #get every img's coordinate of face;[(x,y,w,h),...]
     def find_face_coordinate(self):
         coordinates = []
@@ -25,23 +27,31 @@ class discern_face(object):
     #get face data,arguments:output img size
     def get_face_data(self,size,batch=0):
         cds = self.find_face_coordinate()
-        batch_arr = []
         i = 1
         #获取人脸部位数据，并统一大小
         for item,img in zip(cds,self.imgs):
-            #image = img[item[1]:(item[1]+item[3]),item[0]:(item[0]+item[2]),:]
-            image = img[69:180,69:180,:]
+            item_in = ''
+            if len(item)>0:
+                item_in = item[0]
+            else:
+                self.err_face.append(i-1)
+                continue
+            image = img[item_in[1]:item_in[1]+item_in[3],item_in[0]:item_in[0]+item_in[2],:]
+            #image = img[69:180,69:180,:]
             image_resize = cv2.resize(np.array(image),size,fx=0.25,fy=0.25,interpolation=cv2.INTER_AREA)
-            batch_arr.append(image_resize)
+
             #如果batch为0就不当成迭代对象使用
             if batch>0:
-                if i % batch == 0 or len(self.imgs) <= i:
-                    yield batch_arr
+                yield image_resize
             else:
                 self.face_data.append(image_resize)
             i += 1
         #return self.face_data
     def save_face_data(self,path):
         np.save(path,self.face_data)
+    #get num of img and err_check index.
+    def get_info(self):
+        num = len(self.img_path)
+        return num,self.err_face
 
 

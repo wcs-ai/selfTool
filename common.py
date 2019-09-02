@@ -4,7 +4,7 @@ import threading
 import queue,os
 threads = []
 class c_thread(threading.Thread):
-    def __init__(self,ord):
+    def __init__(self):
         threading.Thread.__init__(self)
         self.result = ''
         self.ord = 0
@@ -14,7 +14,7 @@ class c_thread(threading.Thread):
 def start_thread(num):
     for i in range(num):
 
-        threads.append(c_thread(1))
+        threads.append(c_thread())
         threads[i].start()
 
 def stop_thread():
