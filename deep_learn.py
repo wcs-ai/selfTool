@@ -2,6 +2,7 @@
 # # -*- coding: UTF-8 -*-
 import tensorflow as tf
 from tensorflow.contrib.layers.python.layers import batch_norm
+import numpy as np
 
 class CNN(object):
     #transmit a list or array that be createrd layers' arguments
@@ -40,6 +41,20 @@ class CNN(object):
         mask = tf.stop_gradient(mask)
         res = tf.nn.max_pool(img,ksize=ksize,strides=stride,padding=PADDING)
         return res,mask
+    #反最大池化与反平均池化
+    def unpool(self,tp,fw,step=None,padding="SAME"):
+        #默认滑动步长为2
+        slide_step = 2 if step==None else step
+        shape = tp.shape if type(tp)==np.ndarray else np.shape(tp)
+        assert len(shape)==3,"tp's shape must be 3"
+        for i in range(shape[2]):
+            pass
+        if tp=='max':
+
+            print(1)
+        else:
+
+            pass
     def struct_model(self,img,training):
         image = img
         with tf.device('/gpu:0'):
