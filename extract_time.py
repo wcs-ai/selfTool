@@ -21,7 +21,8 @@ reg = {
     'd2':re.compile('[1-3]?[0-9]?[零一二两三四五六七八九十]?(日|号)'),
     'd3':re.compile('日'),
     'h1':re.compile('早上|中午|晚上|傍晚|今早'),
-    'h2':re.compile('(\d?\d|[一二两三四五六七八九十]+)(时|点|点钟)')
+    'h2':re.compile('(\d?\d|[一二两三四五六七八九十]+)(时|点|点钟)'),
+    'mint':re.compile("(\d?\d|[一二两三四五六七八九十]+)分")
 }
 
 def comment_rank(word):
@@ -76,15 +77,19 @@ def extract(data):
     return t_arr
 
 def tran_num(sen):
+    #点，点钟、分这几个字要去掉
     string = sen
-    china_num = ['零','一','二','三','四','五','六','七','八','九','十']
-    a_num = ['0','1','2','3','4','5','6','7','8','9','']
+    china_num = ['零','一','二','三','四','五','六','七','八','九','十','时','点','点钟','分']
+    a_num = ['0','1','2','3','4','5','6','7','8','9','','','','','']
     for i in range(len(china_num)):
         if china_num[i]!='十':
             string.replace(china_num[i],a_num[i])
         else:
             #十的替换比较特殊
             ord = string.find('十')
+            if ord==-1:
+                continue
+    
             if string[ord+1] in china_num and string[ord-1] in china_num:
                 string.replace('十','')
             elif string[ord-1] not in china_num and string[ord+1] in china_num:
@@ -101,7 +106,9 @@ def word_to_time(sentence):
     r_d = ''
     r_h = ''
     r_min = ''
-
+    #tm1放日期，tm2放具体时间，如果未匹配到具体时间则只返回tm1
+    tm1 = []
+    tm2 = []
 
     ys1 = re.search(reg['y1'], sentence)
     ys2 = re.search(reg['y2'], sentence)
@@ -109,6 +116,7 @@ def word_to_time(sentence):
     ds1 = re.search(reg['d1'], sentence)
     ds2 = re.search(reg['d2'], sentence)
     hs2 = re.search(reg['h2'], sentence)
+    min1 = re.search(reg['mint'],sentence)
 
 #备注：未对个数年月日处理，如19年，55年等缩写简写。把检测到的带年，月，日等字去掉
     if ys1!=None:
@@ -143,6 +151,7 @@ def word_to_time(sentence):
         r_d = tran_num(ds2.group())
     else:
         r_d = day
+    tm1.extend([r_y,r_m,r_d])
 
     #check hour
     if hs2!=None:
@@ -150,9 +159,20 @@ def word_to_time(sentence):
     else:
         r_h = ''
 
+    if min1!=None:
+        r_min = tran_num(min1.group())
+    else:
+        r_min = '00'    
+    tm2.extend([r_h,r_min])
+    
+    for i in range(len(tm1)):
+        tm1[i] = str(tm1[i])
 
+    if r_h=='':
+        tm2_string = ''
+    else:
+        tm2_string = str(tm2[0])+":"+str(tm2[1])       
 
-
-    return str(r_y)+'-'+str(r_m)+'-'+str(r_d)+'-'+(r_h)+'-'+str(r_min)
+    return '-'.join(tm1)+","+tm2_string
 
 
