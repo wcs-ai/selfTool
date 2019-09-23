@@ -2,7 +2,7 @@
 # -*- coding: UTF-8 -*-
 import re
 from datetime import datetime
-
+import jieba.posseg as psg
 h_date = datetime.now()
 year = h_date.year
 month = h_date.month
@@ -22,7 +22,8 @@ reg = {
     'd3':re.compile('日'),
     'h1':re.compile('早上|中午|晚上|傍晚|今早'),
     'h2':re.compile('(\d?\d|[一二两三四五六七八九十]+)(时|点|点钟)'),
-    'mint':re.compile("(\d?\d|[一二两三四五六七八九十]+)分")
+    'mint':re.compile("(\d?\d|[一二两三四五六七八九十]+)分"),
+    's':re.compile("(\d?\d|[一二两三四五六七八九十]+)秒")
 }
 
 def comment_rank(word):
@@ -47,11 +48,19 @@ def comment_rank(word):
     return grade
 
 #extract time.the arguments:(word,nature of word)
-def extract(data):
+def extract(sentence):
     #assert len(data)==2,"data's length must be 2"
     #存储每个时间的数组
+    data = []
+    word = re.search(reg['s'],sentence)
+    st_ = sentence.replace(word.group(),'') if word!=None else sentence
+    dat = psg.cut(st_)
+    for i,j in dat:
+        data.append((i,j))
+    
     words = []
     t_arr = []
+    
     sentence = ''
 
     #保留前一个检测到的时间等级，与当前检测到的时间等级若或者大于等于前者新开一个数组值，否则放到前一个组中。
@@ -79,11 +88,11 @@ def extract(data):
 def tran_num(sen):
     #点，点钟、分这几个字要去掉
     string = sen
-    china_num = ['零','一','二','三','四','五','六','七','八','九','十','时','点','点钟','分']
-    a_num = ['0','1','2','3','4','5','6','7','8','9','','','','','']
+    china_num = ['零','一','二','三','四','五','六','七','八','九','十','时','点','点钟','分','年','月','日']
+    a_num = ['0','1','2','3','4','5','6','7','8','9','','','','','','','','']
     for i in range(len(china_num)):
         if china_num[i]!='十':
-            string.replace(china_num[i],a_num[i])
+            string = string.replace(china_num[i],a_num[i])
         else:
             #十的替换比较特殊
             ord = string.find('十')
