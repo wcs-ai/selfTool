@@ -49,8 +49,6 @@ def count_word(word_arr):
             continue
     return res_obj
 
-def clear_one(data):
-    print(1)
 
 def antistop(words):
     #过滤词、停用词、统计词
@@ -64,6 +62,7 @@ def antistop(words):
 
 class TFIDF(object):
     def __init__(self,words,num):
+        #传入的参数是[[ord,is],[word,row,],...]每一组是一个文档的词，num为关键词数
         self.words = words
         self.sel_num = num
         self.all_words = 0
@@ -98,7 +97,7 @@ class TFIDF(object):
         res =[t[0] for t in sorted(self.TFIDF_DICT.items(),key=lambda k:k[1],reverse=True)]
         return res[0:self.sel_num]
 
-
+#主题模型
 class TopicModel(object):
     def __init__(self,doc_list,keyword_num,model='LSI',num_topics=4):
         self.dictionary = corpora.Dictionary(doc_list)
