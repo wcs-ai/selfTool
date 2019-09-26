@@ -3,6 +3,7 @@
 import threading
 import queue,os
 threads = []
+#多线程
 class c_thread(threading.Thread):
     def __init__(self):
         threading.Thread.__init__(self)
@@ -13,7 +14,6 @@ class c_thread(threading.Thread):
 
 def start_thread(num):
     for i in range(num):
-
         threads.append(c_thread())
         threads[i].start()
 
@@ -40,4 +40,31 @@ def get_all_files(path):
     return files
 
 
+#去除停用词,typ:cn为中文，en为英文
+def stop_word(words,typ='cn'):
+    #停用词处理，传入数据格式：[(word,v),(),...],纯函数
+    
+    stop_word_path = 'SELF_TOOLS/stop_words.txt'
+    if typ=='cn':
+        stop_words = open(stop_word_path,'r').read().split('\n')
+    else:
+        stop_words = ['__',':',',','.','?','-','!','"','"','(',')']    
+    arr = []
+    res = ''
 
+    #words是一个列表的情况
+    if isinstance(words,list) or isinstance(words,tuple):
+        for i in words:
+            if isinstance(i,list) or isinstance(i,tuple):
+                if i[0] in stop_words:
+                    continue
+                else:
+                    arr.append(i)
+            else:
+                if i in stop_words:
+                    continue
+                else:
+                    arr.append(i)   
+    else:
+        if words in stop_words:                     
+    return arr
