@@ -80,7 +80,7 @@ class statistics_document(object):
         dt = len(self.file_arr) // self.cd_num
         j = 0
         for i in range(self.cd_num):
-            if i<self.cd_num+1:
+            if i<self.cd_num-1:
                 datas.put(self.file_arr[j:j+dt])
             else:
                 datas.put(self.file_arr[j:])
@@ -88,7 +88,35 @@ class statistics_document(object):
         common.start_thread(num)
         #get value from quee (get a value every one)
         q_data = datas.get()
-        read_en_txt(q_data,coding)
-    def cn_take(self):
-        
+        self.file_take(q_data)
 
+    def file_take(self,file_list):
+        sentence = ''
+        for name in file_list:
+            content = open(name,'r').read().replace('\n')
+            res = self.word_cut(content)
+            obj = self.calc_wordsNum(res)
+            self.words_obj.append(obj)
+            self.words_list.append(res)
+    #分词、去除停用词、返回词列表，传入一段文字
+    def word_cut(self,text):
+        words = ''
+        if self.typ=='cn':
+            words = jieba.cut(text)
+        else:
+            words = text.split()
+        all_words = []
+        for w in words:
+            all_words.append(w)
+        #去除停用词    
+        all_words = common.stop_word(all_words,typ=self.typ)
+        return all_words
+    #统计每个词的词频    
+    def calc_wordsNum(self,words_list):
+        obj = {}
+        for word in words_list:
+            if word in obj:
+                continue
+            else:
+                obj[word] = words_list.count(word)
+        return obj
