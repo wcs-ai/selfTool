@@ -332,9 +332,9 @@ class TopicModel(object):
             #将每个词的信息和文档的信息传入计算各词与文档的相识度。
             sim = calsim(v,senttopic)
             sim_dic[k] = sim
-
+        #sim_dict中每个词的值为0，还存在问题
         vs = [wt[0] for wt in sorted(sim_dic.items(),key=lambda k:k[1],reverse=True)]
-        #print(vs[0:20])
+        return vs
 
 #主题模型提取关键词
 def topic_extract(word_list,pos=False,keyword_num=10):
@@ -363,12 +363,12 @@ def extract_tfidf(words,num):
 def antistop(words_list,keyword_num=10,algorithm='TFIDF'):
     res = ''
     if algorithm=='TFIDF':
-        td = TFIDF(word_list,keyword_num)
+        td = TFIDF(words_list,keyword_num)
         res = td.get_tfidf()
     elif algorithm=='LSI':
-        topic_model = TopicModel(word_list,keyword_num,model='LSI')
+        topic_model = TopicModel(words_list,keyword_num,model='LSI')
         all_list = []
-        for gh in word_list:
+        for gh in words_list:
             all_list += gh
         res = topic_model.get_simword(all_list)
     elif algorithm=='TEXTRANK':
@@ -376,8 +376,9 @@ def antistop(words_list,keyword_num=10,algorithm='TFIDF'):
         textrank = analyse.textrank
         res = textrank(words_list,keyword_num)
     else:
-        topic_model = TopicModel(word_list,keyword_num,model='LDA')
+        topic_model = TopicModel(words_list,keyword_num,model='LDA')
         all_list = []
-        for gh in word_list:
+        for gh in words_list:
             all_list += gh
         res = topic_model.get_simword(all_list)
+    return res    

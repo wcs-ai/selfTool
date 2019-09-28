@@ -4,78 +4,22 @@ import os,queue
 from SELF_TOOLS import common
 import jieba
 
-words_list = []
-words_obj = {}
-file_words = []
-#读取英文文本,参数：文件路径列表
-def read_en_txt(sequence,coding):
-    global words_list,words_obj
-    assert type(sequence)==list,"inputs is't a list"
-    coding = coding or 'gb2312'
-    q = 0
-
-    en_stop = ['__',':',',','.','?','-','!','"','"','(',')']
-    for file in sequence:
-        assert os.path.isfile(file)==True,"fileError"
-        with open(file,'r') as f:
-            try:
-                f1 = f.read()
-            except:
-                print(q)
-            for c in en_stop:
-                f1 = f1.replace(c,'')
-            f2 = f1.lower().replace('<br />','').split()
-            file_words.append(f2)
-            for word in f2:
-                if word in words_list:
-                    pass
-                else:
-                    words_list.append(word)
-
-                if word in words_obj:
-                    words_obj[word] += 1
-                else:
-                    words_obj[word] = 1
-        q += 1
-
-#英文读取入口
-def en_read(arr,coding,num):
-    #添加到队列中做为多线程使用
-    datas = queue.Queue(num)
-    dt = len(arr) // num
-    j = 0
-    for i in range(num):
-        if i<num+1:
-            datas.put(arr[j:j+dt])
-        else:
-            datas.put(arr[j:])
-        j += dt
-    common.start_thread(num)
-    #get value from quee (get a value every one)
-    q_data = datas.get()
-    read_en_txt(q_data,coding)
-
-#使用get获取解析的值
-def get():
-    common.stop_thread()
-    return words_list,words_obj,file_words
-
 
 class statistics_document(object):
     """docstring for read_file"""
     #sequence:文件队列；typ：读取的是中文还是英文en;coording_num:线程数
-    def __init__(self, quence,coording_num,typ='cn',coding='gb2312'):
+    def __init__(self, data,coording_num=2,typ='cn',coding='gb2312'):
         #super(read_file, self).__init__()
         #words_list:每个文件的词放到一组[[a,b,v],[]];all_words_list:所有的词放到一起组一个一维组
         self.all_words_list = []
         self.words_list = []
         self.words_obj = []
         self.all_words_obj = {}
-        self.file_arr = quence
+        self.file_arr = data
         self.typ = typ
         self.cd_num = coording_num
         self.cd_typ = coding
-    def pre_read(self):
+    def file_take(self):
         datas = queue.Queue(self.cd_num)
         dt = len(self.file_arr) // self.cd_num
         j = 0
@@ -85,29 +29,35 @@ class statistics_document(object):
             else:
                 datas.put(self.file_arr[j:])
             j += dt
-        common.start_thread(num)
+        #启动线程    
+        common.start_thread(self.cd_num)
         #get value from quee (get a value every one)
-        q_data = datas.get()
-        self.file_take(q_data)
+        for que in range(self.cd_num):
+            q_data = datas.get()
+            self.file_take(q_data)
+            for name in q_data:
+                content = open(name,'r').read().replace('\n','')
+                #每个文档的词列表，词频
+                res = self.word_cut(content)
+                obj = self.calc_wordsNum(res)
+                #self.words_obj.append(obj)
+                #self.words_list.append(res)
+                #返回一个可迭代对象
+                yield (res,obj)
+        common.stop_thread()        
 
-    def file_take(self,file_list):
-        sentence = ''
-        for name in file_list:
-            content = open(name,'r').read().replace('\n')
-            res = self.word_cut(content)
-            obj = self.calc_wordsNum(res)
-            self.words_obj.append(obj)
-            self.words_list.append(res)
+        
     #分词、去除停用词、返回词列表，传入一段文字
     def word_cut(self,text):
         words = ''
+        all_words = []
         if self.typ=='cn':
             words = jieba.cut(text)
+            for w in words:
+                all_words.append(w)
         else:
-            words = text.split()
-        all_words = []
-        for w in words:
-            all_words.append(w)
+            all_words = text.split()
+        
         #去除停用词    
         all_words = common.stop_word(all_words,typ=self.typ)
         return all_words
@@ -120,3 +70,29 @@ class statistics_document(object):
             else:
                 obj[word] = words_list.count(word)
         return obj
+    #处理输入的文本类型    
+    def take_text(self):
+        words_list = self.word_cut(self.file_arr)
+        words_obj = self.calc_wordsNum(words_list)
+        return (words_list,words_obj)        
+    #不适用迭代使用一次性获取   
+    def get_result(self,is_all=False):
+        doc_list = []
+        doc_obj = []
+        all_obj = {}
+        for w in self.file_take():
+            if is_all==False:
+                doc_list.append(w[0])
+                doc_obj.append(w[1])
+            else:
+                doc_list.extend(w[0])
+                #合并所有文档词频信息
+                for bj in w[1]:
+                    if bj in all_obj:
+                        all_obj[bj] += w[1].get(bj)
+                    else:
+                        all_obj[bj] = w[1].get(bj)       
+        if(is_all==False):
+            return (doc_list,doc_obj)
+        else:    
+            return (doc_list,all_obj)

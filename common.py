@@ -44,11 +44,10 @@ def get_all_files(path):
 def stop_word(words,typ='cn'):
     #停用词处理，传入数据格式：[(word,v),(),...],纯函数
     
-    stop_word_path = 'SELF_TOOLS/stop_words.txt'
-    if typ=='cn':
-        stop_words = open(stop_word_path,'r').read().split('\n')
-    else:
-        stop_words = ['__',':',',','.','?','-','!','"','"','(',')']    
+    cn_stop = 'SELF_TOOLS/cn_stop.txt'
+    en_stop = 'SELF_TOOLS/en_stop.txt'
+    file_path = cn_stop if typ=='cn' else en_stop
+    stop_words = open(file_path,'r').read().split('\n')      
     arr = []
     res = ''
 
@@ -66,5 +65,10 @@ def stop_word(words,typ='cn'):
                 else:
                     arr.append(i)   
     else:
-        if words in stop_words:                     
+        #传入的是一个字符的情况
+        if words in stop_words:
+            arr = True
+        else:
+            arr = False
+
     return arr
