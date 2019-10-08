@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #-*-coding:UTF-8-*-
 import threading
-import queue,os
+import queue,os,chardet
 threads = []
 #多线程
 class c_thread(threading.Thread):
@@ -41,13 +41,15 @@ def get_all_files(path):
 
 
 #去除停用词,typ:cn为中文，en为英文
-def stop_word(words,typ='cn'):
+def stop_word(words,typ='cn',file_path='SELF_TOOLS/cn_stop.txt'):
     #停用词处理，传入数据格式：[(word,v),(),...],纯函数
     
-    cn_stop = 'SELF_TOOLS/cn_stop.txt'
-    en_stop = 'SELF_TOOLS/en_stop.txt'
-    file_path = cn_stop if typ=='cn' else en_stop
-    stop_words = open(file_path,'r').read().split('\n')      
+    # cn_stop = 'SELF_TOOLS/cn_stop.txt'
+    # en_stop = 'SELF_TOOLS/en_stop.txt'
+    # file_path = cn_stop if typ=='cn' else en_stop
+    read = open(file_path,'rb').read()
+    code = chardet.detect(read)
+    stop_words = read.decode(code['encoding']).replace('\r','').split('\n')    
     arr = []
     res = ''
 
