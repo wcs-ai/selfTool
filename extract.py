@@ -336,28 +336,6 @@ class TopicModel(object):
         vs = [wt[0] for wt in sorted(sim_dic.items(),key=lambda k:k[1],reverse=True)]
         return vs
 
-#主题模型提取关键词
-def topic_extract(word_list,pos=False,keyword_num=10):
-    topic_model = TopicModel(word_list,keyword_num)
-    all_list = []
-    for gh in word_list:
-        all_list += gh
-    print(all_list)
-    topic_model.get_simword(all_list)
-
-#texrank算法提取关键词,直接输入文本
-def textrank_extract(text,pos=False,keyword_num=10):
-    textrank = analyse.textrank
-    keywords = textrank(text,keyword_num)
-    for keyword in keywords:
-        print(keyword+'/')
-
-#TFIDF
-def extract_tfidf(words,num):
-    res = TFIDF(words,num)
-    hh = res.get_tfidf()
-    return hh
-
 
 #调用提取关键词api
 def antistop(words_list,keyword_num=10,algorithm='TFIDF'):
