@@ -1,6 +1,9 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-from scipy.interpolate import interp1d
-from sklearn import preprocessingimport scipy
-import sklearn
+from sklearn.naive_bayes import MultinomialNB
 
+
+class bayes(object):
+	def __init__(self,algorithm="GNB"):
+		self.algorithm = algorithm
+		 

@@ -12,7 +12,7 @@ class vector(object):
 		self.vocab_data = ''
 	#train vocabulary's vector and save this model
 	def train_vocab(self,fileObj,size=100,window=5,min_count=1,workers=5):
-		model = Word2Vec(LineSentence(fileObj,size,window,min_count,workers))
+		model = Word2Vec(LineSentence(fileObj),size,window,min_count,workers)
 		model.save(self.save_path)
 
 	def load_model(self,path):
