@@ -74,3 +74,13 @@ def stop_word(words,typ='cn',file_path='SELF_TOOLS/cn_stop.txt'):
             arr = False
 
     return arr
+
+#读取大型文件时获取指定行
+def getLine(path,method='r',ed='utf-8',ord=0):
+    i = 0
+    file = open(path,method,encoding=ed)
+    while i<ord+1:
+        line = file.readline()
+        if i==ord:
+            return line
+
