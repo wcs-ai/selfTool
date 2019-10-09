@@ -11,8 +11,8 @@ class vector(object):
 		self.save_path = save_path
 		self.vocab_data = ''
 	#train vocabulary's vector and save this model
-	def train_vocab(self,fileObj,size=100,window=5,min_count=1,workers=5):
-		model = Word2Vec(LineSentence(fileObj),size,window,min_count,workers)
+	def train_vocab(self,fileObj,sg=0,size=100,window=5,min_count=1,workers=5):
+		model = Word2Vec(LineSentence(fileObj),sg,size,window,min_count,workers)
 		model.save(self.save_path)
 
 	def load_model(self,path):
@@ -23,7 +23,7 @@ class vector(object):
 		if typ=='vocab':
 			self.load_model(file)
 			for dat in data:
-				word_vector.append(self.vocab_data.get(dat,default=back))
+				word_vector.append(self.vocab_data[dat])
 		return word_vector
 
 
