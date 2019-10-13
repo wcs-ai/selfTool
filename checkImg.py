@@ -35,27 +35,39 @@ class check(object):
 		mask = np.zeros(self.img.shape[:2],np.uint8)
 		bgdModel = np.zeros((1,65),np.float64)
 		fgdModel = np.zeros((1,65),np.float64)
-
 		#限定分割图像的范围
-		rect = (100,50,421,378)
-		img = cv2.grabCut(self.img,mask,rect,bgdModel,fgdModel,5,cv2.GC_INIT_WITH_RECT)
-		#mask2 = np.where((mask==2)|(mask==0),0,1).astype('uint8')
+		rect = (10,10,500,580) 
+		cv2.grabCut(self.img,mask,rect,bgdModel,fgdModel,5,cv2.GC_INIT_WITH_RECT)
+		mask2 = np.where((mask==2)|(mask==0),0,1).astype('uint8')
+
+		self.img = self.img*mask2[:,:,np.newaxis] 
+
+	def watershed(self):
+		gray = cv2.cvtColor(self.img,cv2.COLOR_BGR2GRAY)
+		ret,thresh = cv2.threshold(gray,0,255,cv2.THRESH_BINARY_INV+cv2.THRESH_OTSU)
+		kernel = np.ones((3,3),np.uint8)
+		#变换，腐蚀去除噪声数据
+		opening = cv2.morphologyEx(thresh,cv2.MORPH_OPEN,kernel,iterations=2)
+
+		#膨胀,得到的大部分是前景区域
+		sure_bg = cv2.dilate(opening,kernel,iterations=3)
+		dis_transform = cv2.distanceTransform(opening,cv2.DIST_L2,5)
+		ret,sure_fg = cv2.threshold(dis_transform,0.7*dis_transform.max(),255,0)
+		sure_fg = np.uint8(sure_fg)
+		#前景与背景有交叉部分，通过相减处理
+		unknown = cv2.subtract(sure_bg,sure_fg)
+		ret,markers = cv2.connectedComponents(sure_fg)
+		markers = markers+1
+		markers[unknown==255] = 0
 		
-		#self.img = img*mask2[:,:,np.newaxis]
-		ig = [list(img[0]),list(img[1]),list(img[2])]
-		
-		cv2.imshow('img',ig)
-		cv2.waitKey()
-		# plt.subplot(121)
-		# plt.imshow(img)
-		# plt.title('grab')
-		# plt.subplot(122)
-		# plt.imshow(self.img)
-		# plt.title('org')
-		# plt.show()
+		markers = cv2.watershed(self.img,markers)
+
+		self.img[markers==-1] = [255,0,0]
 
 
-	def show_res(self):
+
+
+	def show(self):
 		cv2.imshow('img',self.img)
 		cv2.waitKey()
 
