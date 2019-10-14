@@ -37,14 +37,14 @@ class check(object):
 		fgdModel = np.zeros((1,65),np.float64)
 
 		#限定分割图像的范围
-		rect = (100,50,421,378)
+		rect = (100,100,80,80)
 		img = cv2.grabCut(self.img,mask,rect,bgdModel,fgdModel,5,cv2.GC_INIT_WITH_RECT)
-		#mask2 = np.where((mask==2)|(mask==0),0,1).astype('uint8')
+		mask2 = np.where((mask==2)|(mask==0),0,1).astype('uint8')
 		
-		#self.img = img*mask2[:,:,np.newaxis]
-		ig = [list(img[0]),list(img[1]),list(img[2])]
+		nimg = img * mask2[:,:,np.newaxis]
+		#ig = [list(img[0]),list(img[1]),list(img[2])]
 		
-		cv2.imshow('img',ig)
+		cv2.imshow('img',nimg)
 		cv2.waitKey()
 		# plt.subplot(121)
 		# plt.imshow(img)
