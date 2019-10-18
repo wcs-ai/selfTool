@@ -84,3 +84,41 @@ def getLine(path,method='r',ed='utf-8',ord=0):
         if i==ord:
             return line
 
+#打乱数据
+def shufle_data(x,y):
+    lg = np.arange(0,len(y))
+    rg = np.random.shuffle(lg)
+    res_x = x[rg]
+    res_y = y[rg]
+    return (res_x,res_y)
+
+#将数据集划分为训练集和测试集
+def divide_data(x,y,val=0.8):
+    lg = len(y)
+    train_len = round(lg*0.8)
+    test_len = lg - train_len
+
+    data = {
+        "train_x":x[0:train_len],
+        "test_x":x[-test_len:],
+        "train_y":y[0:train_len],
+        "test_y":y[-test_len:]
+    }
+    return data
+#test the precision about two target
+def precision(x,y):
+    if isinstance(x,np.ndarray):
+        pass
+    else:
+        x = np.array(x)
+
+    if isinstance(y,np.ndarray):
+        pass
+    else:
+        y = np.array(y)
+
+    z = list(x==y)
+    leg = len(z)
+    ok = z.count(True)
+    val = round(ok/leg)
+    return val        

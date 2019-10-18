@@ -29,4 +29,5 @@ class bayes(object):
 		res = self.model.predict(x)
 		return res
 
+
 		 
