@@ -4,7 +4,32 @@ import tensorflow as tf
 from tensorflow.contrib.layers.python.layers import batch_norm
 import numpy as np
 
-class CNN(object):
+UNIFY_FLOAT = tf.float32
+SESS = tf.InteractiveSession()
+
+
+def init():
+    SESS.run(tf.global_variables_initializer())
+
+def create_wt(size,name='variable'):
+        res = tf.random_normal(size,stddev=1,mean=0)
+        return tf.Variable(res,dtype=tf.float32,name=name)
+def create_ba(size,name='variable'):
+    bias = tf.random_uniform(size,minval=0,maxval=1)
+    return tf.Variable(bias,dtype=tf.float32,name=name)
+
+#封装了归一化、激活的卷积操作
+def conv2d(img,filter,bas,training,strides=[1,1,1,1],PADDING='SAME'):
+    cvd = tf.nn.conv2d(img,filter,strides=strides,padding=PADDING) + bas
+    norm_cvd = batch_norm(cvd,decay=0.9,is_training=training)
+    elu_cvd = tf.nn.relu(norm_cvd)   
+    return elu_cvd
+
+def implemet_sess(data):
+    s = SESS.run(data)
+    return s
+
+class Cnn(object):
     #transmit a list or array that be createrd layers' arguments
     def __init__(self,wts_size,bas_size):
         assert type(wts_size)==tuple or type(wts_size)==list,"wts_size can't iterable"
@@ -15,23 +40,12 @@ class CNN(object):
         self.convole_layers = []
         self.pool_layers = []
         for sw,sb in zip(wts_size,bas_size):
-            self.wts.append(self.create_wt(sw))
-            self.bas.append(self.create_ba(sb))
+            self.wts.append(create_wt(sw))
+            self.bas.append(create_ba(sb))
             self.convole_layers.append(None)
             self.pool_layers.append(None)
 
-    def create_wt(self,size):
-        res = tf.random_normal(size,stddev=1,mean=0)
-        return tf.Variable(res,dtype=tf.float32)
-    def create_ba(self,size):
-        bias = tf.random_uniform(size,minval=0,maxval=1)
-        return tf.Variable(bias,dtype=tf.float32)
-    #封装了归一化、激活的卷积操作
-    def conv2d(self,IMG,FILTER,bas,training,STRIDE=[1,1,1,1],PADDING='SAME'):
-        cvd = tf.nn.conv2d(IMG,FILTER,strides=STRIDE,padding=PADDING) + bas
-        norm_cvd = batch_norm(cvd,decay=0.9,is_training=training)
-        elu_cvd = tf.nn.relu(norm_cvd)
-        return elu_cvd
+    
     def avage_pool(self,img,ksize=[1,3,3,1],stride=[1,2,2,1],PADDING='SAME'):
         pool = tf.nn.avg_pool(img,ksize=ksize,strides=stride,padding=PADDING)
         return pool
@@ -50,7 +64,6 @@ class CNN(object):
         for i in range(shape[2]):
             pass
         if tp=='max':
-
             print(1)
         else:
 
@@ -65,7 +78,7 @@ class CNN(object):
                 image = self.convole_layers[i]
 
 
-class RNN(object):
+class Rnn(object):
     def __init__(self):
         print('rnn')
 
