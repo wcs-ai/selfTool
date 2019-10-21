@@ -2,6 +2,7 @@
 #-*-coding:UTF-8-*-
 import threading
 import queue,os,chardet
+import numpy as np
 threads = []
 #多线程
 class c_thread(threading.Thread):

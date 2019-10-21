@@ -66,8 +66,8 @@ class Cnn(object):
         if tp=='max':
             print(1)
         else:
-
             pass
+            
     def struct_model(self,img,training):
         image = img
         with tf.device('/gpu:0'):
