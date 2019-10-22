@@ -3,6 +3,8 @@
 import threading
 import queue,os,chardet
 import numpy as np
+
+
 threads = []
 #多线程
 class c_thread(threading.Thread):
@@ -88,9 +90,9 @@ def getLine(path,method='r',ed='utf-8',ord=0):
 #打乱数据
 def shufle_data(x,y):
     lg = np.arange(0,len(y))
-    rg = np.random.shuffle(lg)
-    res_x = x[rg]
-    res_y = y[rg]
+    np.random.shuffle(lg)
+    res_x = x[lg]
+    res_y = y[lg]
     return (res_x,res_y)
 
 #将数据集划分为训练集和测试集
@@ -122,4 +124,57 @@ def precision(x,y):
     leg = len(z)
     ok = z.count(True)
     val = round(ok/leg)
-    return val        
+    return val
+
+#批量读取数据的迭代器。
+def next_batch(data,batch=1):
+    j = 0
+    for c in data:
+        bt = []
+        bt.append(c[j:j+batch])
+        j = j + batch
+    yield bt
+
+def one_hot(label,deep=10):
+    lb = [1 if(c + 1)==label else 0 for c in range(deep)]
+    return lb 
+
+#用annoy库对训练好的词向量构建快速查找
+def construct_search(path):
+    from gensim.models import KeyedVectors
+    import json
+    from collections import OrderedDict
+    tc_wv_model = KeyedVectors.load_word2vec_format(path,binary=True)
+    word_index = OrderedDict()
+    #counter为索引，key为词;构建一个id词汇映射表，并存为json文件
+
+    for counter,key in enumerate(tc_wv_model.vocab.keys()):
+        word_index[key] = counter
+        break    
+
+    with open('data/baike.json','w') as fp:
+        json.dump(word_index,fp)
+
+    from annoy import AnnoyIndex
+
+    tc_index = AnnoyIndex(128)
+
+    for i,key in enumerate(tc_wv_model.vocab.keys()):
+        #tc_wv_model[key]为词对应的词向量
+        v = tc_wv_model[key]
+        #每条数据按 (索引,词) 加入
+        tc_index.add_item(i,v)
+        break
+
+    tc_index.build(10)
+    tc_index.save('data/baike_index_build.index')
+
+#计算卷积，池化中VALID情况想要的卷积核或滤波器宽度。
+def calc_nucleus_width(out_width,input_width,step,method="VALID"):
+    if method=="VALID":
+        nucleus_width = input_width - (out_width*step - 1)
+    return nucleus_width
+
+#低版本tensorflow没有该激活函数，自己封装的。
+def swish(x):
+    print(x)
