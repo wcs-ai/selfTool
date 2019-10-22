@@ -4,9 +4,7 @@ import tensorflow as tf
 from tensorflow.contrib.layers.python.layers import batch_norm
 import numpy as np
 
-UNIFY_FLOAT = tf.float32
-SESS = tf.InteractiveSession()
-
+__UNIFY_FLOAT__ = tf.float32
 
 def init():
     SESS.run(tf.global_variables_initializer())
@@ -25,9 +23,22 @@ def conv2d(img,filter,bas,training,strides=[1,1,1,1],PADDING='SAME'):
     elu_cvd = tf.nn.relu(norm_cvd)   
     return elu_cvd
 
-def implemet_sess(data):
-    s = SESS.run(data)
-    return s
+
+#低版本tensorflow没有该激活函数，自己封装的。
+def Swish(x,beta=1):
+    return x*tf.nn.sigmoid(x*beta)
+
+#计算损失值
+def calc_loss(labels,logits,method="softmax"):
+    loss = ''
+    if method=="softmax":
+        loss = tf.nn.softmax_cross_entropy_with_logits(labels=labels,logits=logits)
+    else:
+        loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=labels,logits=logits)
+
+    cost = tf.reduce_mean(loss)
+    return cost
+
 
 class Cnn(object):
     #transmit a list or array that be createrd layers' arguments
