@@ -3,7 +3,7 @@
 import threading
 import queue,os,chardet
 import numpy as np
-
+import math
 
 threads = []
 #多线程
@@ -145,17 +145,23 @@ class _Alone_yield(object):
             
 
 #批量读取数据的迭代器。
-def next_batch(data,data_num=None,batch=1):
-    data_len = data_num or len(data)
-    data_dict = {}
-    batch_res = []
-    for 
-    
-    return batch_res
+def get_batch(data,data_num=None,batch=1):
+    data_len = len(data[0])
+    iter_numebr = math.ceil(data_len/batch)
+    j = 0
+    #最后一个迭代项不足batch数时也能使用
+    for c in range(iter_numebr):
+        batch_res = [i[j:j+batch] for i in data]
+        j = j + batch
+        yield batch_res
 
-def one_hot(label,deep=10):
-    lb = [1 if(c + 1)==label else 0 for c in range(deep)]
-    return lb 
+#批量转为one_hot标签
+def one_hot(batch_label,deep=10):
+    hot_res = []
+    for b in batch_label:
+        lb = [1 if(c + 1)==b else 0 for c in range(deep)]
+        hot_res.append(lb)
+    return hot_res 
 
 #用annoy库对训练好的词向量构建快速查找
 def construct_search(path):
@@ -166,24 +172,29 @@ def construct_search(path):
     word_index = OrderedDict()
     #counter为索引，key为词;构建一个id词汇映射表，并存为json文件
 
+    """
     for counter,key in enumerate(tc_wv_model.vocab.keys()):
         word_index[key] = counter    
 
     with open('data/baike.json','w') as fp:
         json.dump(word_index,fp)
+    """
 
     from annoy import AnnoyIndex
 
-    tc_index = AnnoyIndex(128)
+    tc_index = AnnoyIndex(128,metric="angular")
 
     for i,key in enumerate(tc_wv_model.vocab.keys()):
         #tc_wv_model[key]为词对应的词向量
         v = tc_wv_model[key]
         #每条数据按 (索引,词) 加入
         tc_index.add_item(i,v)
-
-    tc_index.build(10)
-    tc_index.save('data/baike_index_build.index')
+    
+        # if i==6400383:
+        #     break
+    #传入的数表示建立的树的个数，多则精度高，但所需时间长
+    tc_index.build(20)
+    tc_index.save('data/baike_vector.ann')
 
 #计算卷积，池化中VALID情况想要的卷积核或滤波器宽度。
 def calc_nucleus_width(out_width,input_width,step,method="VALID"):

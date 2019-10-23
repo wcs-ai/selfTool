@@ -39,7 +39,21 @@ def calc_loss(labels,logits,method="softmax"):
     cost = tf.reduce_mean(loss)
     return cost
 
+#计算精确度
+def calc_accuracy(logits,labels):
+    eq = tf.equal(logits,labels)
+    accu = tf.cast(eq,tf.int16)
+    return tf.reduce_mean(accu)
 
+#用于测试时建立的session
+def test_session(data,init=False):
+    sess = tf.InteractiveSession()
+    if init==True:
+        sess.run(tf.global_variables_initializer())
+    res = sess.run(data)
+    return res
+
+    
 class Cnn(object):
     #transmit a list or array that be createrd layers' arguments
     def __init__(self,wts_size,bas_size):
