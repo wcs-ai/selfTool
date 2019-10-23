@@ -39,11 +39,30 @@ def calc_loss(labels,logits,method="softmax"):
     cost = tf.reduce_mean(loss)
     return cost
 
-#计算精确度
+#计算精确度,不能使用tensor类型的值
 def calc_accuracy(logits,labels):
-    eq = tf.equal(logits,labels)
-    accu = tf.cast(eq,tf.int16)
-    return tf.reduce_mean(accu)
+    res = []
+    for i,j in zip(logits,labels):
+        a = i if type(i)==np.ndarray else np.array(i)
+        b = j if type(j)==np.ndarray else np.array(j)
+        if(a==b).all():
+            res.append(1)
+        else:
+            res.append(0)
+
+    #eq = tf.equal(logits,labels)
+    #accu = tf.cast(eq,tf.int16)
+    accu = np.mean(res)
+    return accu
+
+#优化器
+def take_optimize(loss,start_learning=0.05,end_step=10,step=10,speed=0.8,method="ADM"):
+    rate = tf.train.exponential_decay(start_learning,end_step,step,speed)
+    if method=="ADM":
+        _optimize = tf.train.AdamOptimizer
+
+    return _optimize(rate).minimize(loss)
+
 
 #用于测试时建立的session
 def test_session(data,init=False):
