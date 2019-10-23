@@ -149,8 +149,7 @@ def construct_search(path):
     #counter为索引，key为词;构建一个id词汇映射表，并存为json文件
 
     for counter,key in enumerate(tc_wv_model.vocab.keys()):
-        word_index[key] = counter
-        break    
+        word_index[key] = counter    
 
     with open('data/baike.json','w') as fp:
         json.dump(word_index,fp)
@@ -164,7 +163,6 @@ def construct_search(path):
         v = tc_wv_model[key]
         #每条数据按 (索引,词) 加入
         tc_index.add_item(i,v)
-        break
 
     tc_index.build(10)
     tc_index.save('data/baike_index_build.index')
