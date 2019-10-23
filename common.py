@@ -126,14 +126,32 @@ def precision(x,y):
     val = round(ok/leg)
     return val
 
+
+class _Alone_yield(object):
+    def __init__(self,data):
+        self.data = data
+    def run(self):
+        for i in self.data:
+            yield i
+    def get(self,batch):
+        res = []
+        i = 0
+        for j in self.run():
+            if i<batch:
+                res.append(j)
+            else:
+                break
+        return res
+            
+
 #批量读取数据的迭代器。
-def next_batch(data,batch=1):
-    j = 0
-    for c in data:
-        bt = []
-        bt.append(c[j:j+batch])
-        j = j + batch
-    yield bt
+def next_batch(data,data_num=None,batch=1):
+    data_len = data_num or len(data)
+    data_dict = {}
+    batch_res = []
+    for 
+    
+    return batch_res
 
 def one_hot(label,deep=10):
     lb = [1 if(c + 1)==label else 0 for c in range(deep)]
@@ -173,6 +191,4 @@ def calc_nucleus_width(out_width,input_width,step,method="VALID"):
         nucleus_width = input_width - (out_width*step - 1)
     return nucleus_width
 
-#低版本tensorflow没有该激活函数，自己封装的。
-def swish(x):
-    print(x)
+
