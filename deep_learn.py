@@ -42,6 +42,7 @@ def calc_loss(labels,logits,method="softmax"):
 #计算精确度,不能使用tensor类型的值
 def calc_accuracy(logits,labels):
     res = []
+    """
     for i,j in zip(logits,labels):
         a = i if type(i)==np.ndarray else np.array(i)
         b = j if type(j)==np.ndarray else np.array(j)
@@ -49,10 +50,10 @@ def calc_accuracy(logits,labels):
             res.append(1)
         else:
             res.append(0)
-
-    #eq = tf.equal(logits,labels)
-    #accu = tf.cast(eq,tf.int16)
-    accu = np.mean(res)
+    """
+    eq = tf.equal(logits,labels)
+    accu = tf.reduce_mean(tf.cast(eq,tf.int16))
+    #accu = np.mean(res)
     return accu
 
 #优化器
