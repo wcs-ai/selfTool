@@ -182,18 +182,18 @@ def construct_search(path):
 
     from annoy import AnnoyIndex
 
-    tc_index = AnnoyIndex(128,metric="angular")
+    tc_index = AnnoyIndex(128)
 
+    
     for i,key in enumerate(tc_wv_model.vocab.keys()):
         #tc_wv_model[key]为词对应的词向量
         v = tc_wv_model[key]
         #每条数据按 (索引,词) 加入
         tc_index.add_item(i,v)
-    
-        # if i==6400383:
-        #     break
+   
+
     #传入的数表示建立的树的个数，多则精度高，但所需时间长
-    tc_index.build(20)
+    tc_index.build(30)
     tc_index.save('data/baike_vector.ann')
 
 #计算卷积，池化中VALID情况想要的卷积核或滤波器宽度。
