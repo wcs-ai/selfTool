@@ -8,15 +8,18 @@ __UNIFY_FLOAT__ = tf.float32
 
 
 #创建，随机生成参数
-def create_argument(size,dtype=__UNIFY_FLOAT__,name="var"):
-        res = tf.random_normal(size,stddev=1,mean=0,dtype=dtype)
-        return tf.Variable(res,dtype=dtype)
+def create_weight(size,dtype=__UNIFY_FLOAT__,name="weight"):
+    res = tf.truncated_normal(size,stddev=1,mean=0,dtype=dtype)
+    return tf.Variable(res,dtype=dtype)
+def create_bias(size,dtype=__UNIFY_FLOAT__,name="bias"):
+    bias = tf.constant(0.1,shape=size,dtype=dtype,name=name)
+    return tf.Variable(bias,dtype=dtype,name=name)
 
 #封装了归一化、激活的卷积操作,数据、卷积核、偏置值、激活函数、是否是训练状态、滑动步长
-def conv2d(data,filter,bas=0,activate_function=tf.nn.relu,training=True,strides=[1,1,1,1],PADDING='SAME'):
+def conv2d(data,filter,bias=0,activate_function=tf.nn.relu,training=True,strides=[1,1,1,1],PADDING='SAME'):
     cvd = tf.nn.conv2d(data,filter,strides=strides,padding=PADDING)
-    if bas!=0:
-        cvd = tf.nn.bias_add(cvd,bas)
+    if bias!=0:
+        cvd = tf.nn.bias_add(cvd,bias)
     #暂时不添加dropout和正则
     norm_cvd = batch_norm(cvd,decay=0.9,is_training=training)
     elu_cvd = activate_function(norm_cvd)
@@ -72,6 +75,9 @@ def test_session(data,init=False):
     res = sess.run(data)
     return res
 
+def max_pool(data,ksize=[1,3,3,1],strides=[1,2,2,1]):
+        pool = tf.nn.max_pool(data,ksize=ksize,strides=strides,padding="SAME")
+        return pool
     
 class Cnn(object):
     #transmit a list or array that be createrd layers' arguments
