@@ -6,6 +6,7 @@
 """
 import numpy as np
 import pandas as pd
+from sklearn import preprocessing
 
 
 class dispose(object):
@@ -41,7 +42,22 @@ class dispose(object):
 			#notnull()将数据转为True，False表示
 			arr_null = arr.notnull()
 			for n in range(len(self.shape[1])):
-				
+				print(n)
 		self.take_data_after = arr_drop
 
-		
+
+
+
+#数据规范化
+def norm_data(data,query_shape,method='norm'):
+	shape = np.shape(data)
+	take_data = []
+	dt = np.reshape(data,query_shape)
+
+	if len(shape)>2:
+		for d in dt:
+			take_data.append(preprocessing.normalize(d,norm='l2'))
+	else:
+		take_data = preprocessing.normalize(dt,norm='l2')
+	res_data = np.reshape(take_data,shape)
+	return res_data
