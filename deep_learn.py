@@ -6,21 +6,20 @@ import numpy as np
 
 __UNIFY_FLOAT__ = tf.float32
 
-def init():
-    SESS.run(tf.global_variables_initializer())
 
-def create_wt(size,name='variable'):
-        res = tf.random_normal(size,stddev=1,mean=0)
-        return tf.Variable(res,dtype=tf.float32,name=name)
-def create_ba(size,name='variable'):
-    bias = tf.random_uniform(size,minval=0,maxval=1)
-    return tf.Variable(bias,dtype=tf.float32,name=name)
+#创建，随机生成参数
+def create_argument(size,dtype=__UNIFY_FLOAT__,name="var"):
+        res = tf.random_normal(size,stddev=1,mean=0,dtype=dtype)
+        return tf.Variable(res,dtype=dtype)
 
-#封装了归一化、激活的卷积操作
-def conv2d(img,filter,bas,training,strides=[1,1,1,1],PADDING='SAME'):
-    cvd = tf.nn.conv2d(img,filter,strides=strides,padding=PADDING) + bas
+#封装了归一化、激活的卷积操作,数据、卷积核、偏置值、激活函数、是否是训练状态、滑动步长
+def conv2d(data,filter,bas=0,activate_function=tf.nn.relu,training=True,strides=[1,1,1,1],PADDING='SAME'):
+    cvd = tf.nn.conv2d(data,filter,strides=strides,padding=PADDING)
+    if bas!=0:
+        cvd = tf.nn.bias_add(cvd,bas)
+    #暂时不添加dropout和正则
     norm_cvd = batch_norm(cvd,decay=0.9,is_training=training)
-    elu_cvd = tf.nn.relu(norm_cvd)   
+    elu_cvd = activate_function(norm_cvd)
     return elu_cvd
 
 
@@ -39,7 +38,7 @@ def calc_loss(labels,logits,method="softmax"):
     cost = tf.reduce_mean(loss)
     return cost
 
-#计算精确度,不能使用tensor类型的值
+#计算精确度
 def calc_accuracy(logits,labels):
     res = []
     """
