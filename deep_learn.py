@@ -16,8 +16,8 @@ def create_bias(size,dtype=__UNIFY_FLOAT__,name="bias"):
     return tf.Variable(bias,dtype=dtype,name=name)
 
 #封装了归一化、激活的卷积操作,数据、卷积核、偏置值、激活函数、是否是训练状态、滑动步长
-def conv2d(data,filter,bias=0,activate_function=tf.nn.relu,training=True,strides=[1,1,1,1],PADDING='SAME'):
-    cvd = tf.nn.conv2d(data,filter,strides=strides,padding=PADDING)
+def conv2d(data,nucel,bias=0,activate_function=tf.nn.relu,training=True,strides=[1,1,1,1],PADDING='SAME'):
+    cvd = tf.nn.conv2d(data,nucel,strides=strides,padding=PADDING)
     if bias!=0:
         cvd = tf.nn.bias_add(cvd,bias)
     #暂时不添加dropout和正则
@@ -76,35 +76,39 @@ def test_session(data,init=False):
     return res
 
 def max_pool(data,ksize=[1,3,3,1],strides=[1,2,2,1]):
-        pool = tf.nn.max_pool(data,ksize=ksize,strides=strides,padding="SAME")
-        return pool
-    
+    pool = tf.nn.max_pool(data,ksize=ksize,strides=strides,padding="SAME")
+    return pool
+
+def avg_pool(data,ksize=[1,3,3,1],stride=[1,2,2,1],PADDING='SAME'):
+    pool = tf.nn.avg_pool(data,ksize=ksize,strides=stride,padding=PADDING)
+    return pool
+
 class Cnn(object):
     #transmit a list or array that be createrd layers' arguments
-    def __init__(self,wts_size,bas_size):
-        assert type(wts_size)==tuple or type(wts_size)==list,"wts_size can't iterable"
-        assert type(bas_size)==tuple or type(bas_size)==list,"bas_size can't iterable"
+    def __init__(self):
+        self.op = 'rnn'
+        self.ACTIVATE_FUNCTION = Swish
 
-        self.wts = []
-        self.bas = []
-        self.convole_layers = []
-        self.pool_layers = []
-        for sw,sb in zip(wts_size,bas_size):
-            self.wts.append(create_wt(sw))
-            self.bas.append(create_ba(sb))
-            self.convole_layers.append(None)
-            self.pool_layers.append(None)
+    def multi_layer(self,data,weights,biass):
+        argument_num = len(biass)
+        layer_res = data
+        i = 0
+        for w,b in zip(weights,biass):
+            if i==argument_num-1:
+                layer_res = conv2d(layer_res,w,b,activate_function=self.ACTIVATE_FUNCTION)
+            else:
+                cvd = conv2d(layer_res,w,b)
+                layer_res = max_pool(cvd)
+        return layer_res
 
-    
-    def avage_pool(self,img,ksize=[1,3,3,1],stride=[1,2,2,1],PADDING='SAME'):
-        pool = tf.nn.avg_pool(img,ksize=ksize,strides=stride,padding=PADDING)
-        return pool
+
     #返回最大池化结果和，最大值位置
-    def max_pool(self,img,ksize,stride=[1,2,2,1],PADDING='SAME'):
+    def max_pool_mask(self,img,ksize,stride=[1,2,2,1],PADDING='SAME'):
         _a,mask = tf.nn.max_pool_with_argmax(img,ksize=ksize,strides=stride,padding=PADDING)
         mask = tf.stop_gradient(mask)
         res = tf.nn.max_pool(img,ksize=ksize,strides=stride,padding=PADDING)
         return res,mask
+
     #反最大池化与反平均池化
     def unpool(self,tp,fw,step=None,padding="SAME"):
         #默认滑动步长为2
@@ -117,15 +121,12 @@ class Cnn(object):
             print(1)
         else:
             pass
-            
-    def struct_model(self,img,training):
-        image = img
-        with tf.device('/gpu:0'):
-            for i in range(len(self.bas)):
 
-                self.convole_layers[i] = self.conv2d(image,self.wts[i],self.bas[i],training=training)
-                self.pool_layers[i] = self.max_pool(image,[1,2,2,1])
-                image = self.convole_layers[i]
+    def run(self,data,weights,biass,ksize,shape):
+        last_res = self.multi_layer(data,weights,biass)
+        avg = avg_pool(last_res,ksize,stride=ksize)
+        return tf.reshape(avg,shape)
+        #return last_res
 
 
 class Rnn(object):
