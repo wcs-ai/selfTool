@@ -46,18 +46,31 @@ class dispose(object):
 		self.take_data_after = arr_drop
 
 
-
-
 #数据规范化
 def norm_data(data,query_shape,method='norm'):
 	shape = np.shape(data)
 	take_data = []
 	dt = np.reshape(data,query_shape)
 
+	if method=='norm':
+		scaler = preprocessing.normalize
+	elif method=='max-min':
+		scaler = preprocessing.MinMaxScaler()
+	elif method=='qt':
+		scaler = preprocessing.QuantileTransformer()
+
+	#可批量归一化数据
 	if len(shape)>2:
 		for d in dt:
-			take_data.append(preprocessing.normalize(d,norm='l2'))
+			if method=='norm':
+				take_data.append(scaler(d,norm='l2'))
+			else:
+				take_data.append(scaler.fit_transform(d))
 	else:
-		take_data = preprocessing.normalize(dt,norm='l2')
+		if method=='norm':
+			take_data = scaler(d,norm='l2')
+		else:
+			take_data = scaler.fit_transform(d)
+	#还原数据形状
 	res_data = np.reshape(take_data,shape)
 	return res_data

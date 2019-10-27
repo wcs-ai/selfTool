@@ -17,11 +17,13 @@ def create_bias(size,dtype=__UNIFY_FLOAT__,name="bias"):
 
 #封装了归一化、激活的卷积操作,数据、卷积核、偏置值、激活函数、是否是训练状态、滑动步长
 def conv2d(data,nucel,bias=0,activate_function=tf.nn.relu,training=True,strides=[1,1,1,1],PADDING='SAME'):
-    cvd = tf.nn.conv2d(data,nucel,strides=strides,padding=PADDING)
+    x = tf.nn.dropout(data,0.8)
+    cvd = tf.nn.conv2d(x,nucel,strides=strides,padding=PADDING)
     if bias!=0:
         cvd = tf.nn.bias_add(cvd,bias)
     #暂时不添加dropout和正则
-    norm_cvd = batch_norm(cvd,decay=0.9,is_training=training)
+    #norm_cvd = batch_norm(cvd,decay=0.9,is_training=training)
+    norm_cvd = cvd
     elu_cvd = activate_function(norm_cvd)
     return elu_cvd
 
@@ -39,7 +41,7 @@ def calc_loss(labels,logits,method="softmax"):
         loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=labels,logits=logits)
 
     cost = tf.reduce_mean(loss)
-    return cost
+    return tf.reduce_sum(loss)
 
 #计算精确度
 def calc_accuracy(logits,labels):
@@ -82,6 +84,17 @@ def max_pool(data,ksize=[1,3,3,1],strides=[1,2,2,1]):
 def avg_pool(data,ksize=[1,3,3,1],stride=[1,2,2,1],PADDING='SAME'):
     pool = tf.nn.avg_pool(data,ksize=ksize,strides=stride,padding=PADDING)
     return pool
+
+#检查模型是否保存，及其迭代次数
+def check_point(save_path):
+    #若保存，路径下会有一个checkpoint文件
+    kpt = tf.train.latest_checkpoint(save_path)
+    if kpt!=None:
+        ind = kpt.find('-')
+        step = int(kpt[ind+1:])
+        return (True,step)
+    else:
+        return (False,0)
 
 class Cnn(object):
     #transmit a list or array that be createrd layers' arguments

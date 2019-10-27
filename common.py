@@ -24,7 +24,10 @@ def stop_thread():
     for c in threads:
         c.join()
 
-
+#查看字符使用的编码格式
+def look_encode(obj):
+    v = chardet.detect(obj)
+    return v['encoding']
 # 获取一个文件夹下的所有文件
 def get_all_files(path):
     files = []
@@ -126,23 +129,7 @@ def precision(x,y):
     val = round(ok/leg)
     return val
 
-
-class _Alone_yield(object):
-    def __init__(self,data):
-        self.data = data
-    def run(self):
-        for i in self.data:
-            yield i
-    def get(self,batch):
-        res = []
-        i = 0
-        for j in self.run():
-            if i<batch:
-                res.append(j)
-            else:
-                break
-        return res
-            
+ 
 
 #批量读取数据的迭代器。
 def get_batch(data,data_num=None,batch=1):
@@ -156,12 +143,13 @@ def get_batch(data,data_num=None,batch=1):
         yield batch_res
 
 #批量转为one_hot标签
-def one_hot(batch_label,deep=10):
+def one_hot(batch_label,gap=0,deep=10):
+    #默认类是从0开始
     hot_res = []
     for b in batch_label:
-        lb = [1 if(c + 1)==b else 0 for c in range(deep)]
+        lb = [1 if (c+gap)==b else 0 for c in range(deep)]
         hot_res.append(lb)
-    return hot_res 
+    return hot_res
 
 #用annoy库对训练好的词向量构建快速查找
 def construct_search(path):
