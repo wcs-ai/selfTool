@@ -22,8 +22,8 @@ def conv2d(data,nucel,bias=0,activate_function=tf.nn.relu,training=True,strides=
     if bias!=0:
         cvd = tf.nn.bias_add(cvd,bias)
     #暂时不添加dropout和正则
-    #norm_cvd = batch_norm(cvd,decay=0.9,is_training=training)
-    norm_cvd = cvd
+    norm_cvd = batch_norm(cvd,decay=0.9,is_training=training)
+    #norm_cvd = cvd
     elu_cvd = activate_function(norm_cvd)
     return elu_cvd
 
@@ -33,15 +33,17 @@ def Swish(x,beta=1):
     return x*tf.nn.sigmoid(x*beta)
 
 #计算损失值
-def calc_loss(labels,logits,method="softmax"):
+def calc_loss(labels,logits,back="mean",method="softmax"):
     loss = ''
     if method=="softmax":
         loss = tf.nn.softmax_cross_entropy_with_logits(labels=labels,logits=logits)
     else:
         loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=labels,logits=logits)
 
-    cost = tf.reduce_mean(loss)
-    return tf.reduce_sum(loss)
+    if back=="mean":
+        return tf.reduce_mean(loss)
+    else:
+        return tf.reduce_sum(loss)
 
 #计算精确度
 def calc_accuracy(logits,labels):
@@ -66,8 +68,7 @@ def take_optimize(loss,start_learning=0.05,end_step=10,step=10,speed=0.8,method=
     if method=="ADM":
         _optimize = tf.train.AdamOptimizer
 
-    return _optimize(rate).minimize(loss)
-
+    return _optimize(rate).minimize(loss),rate
 
 #用于测试时建立的session
 def test_session(data,init=False):

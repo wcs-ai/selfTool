@@ -190,4 +190,14 @@ def calc_nucleus_width(out_width,input_width,step,method="VALID"):
         nucleus_width = input_width - (out_width*step - 1)
     return nucleus_width
 
-
+#使用pickle模块存取数据
+def make_pickle(file,data=None,op="save"):
+    import pickle
+    res = ''
+    if op=="save":
+        with open(file,'wb') as obj:
+            pickle.dump(data,obj,protocol=None)
+    else:
+        with open(file,'rb') as obj:
+            res = pickle.load(obj)
+        return res
