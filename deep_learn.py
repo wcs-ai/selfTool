@@ -17,11 +17,11 @@ def create_bias(size,dtype=__UNIFY_FLOAT__,name="bias"):
 
 #封装了归一化、激活的卷积操作,数据、卷积核、偏置值、激活函数、是否是训练状态、滑动步长
 def conv2d(data,nucel,bias=0,activate_function=tf.nn.relu,training=True,strides=[1,1,1,1],PADDING='SAME'):
-    x = tf.nn.dropout(data,0.8)
-    cvd = tf.nn.conv2d(x,nucel,strides=strides,padding=PADDING)
+    #x = tf.nn.dropout(data,0.8)
+    cvd = tf.nn.conv2d(data,nucel,strides=strides,padding=PADDING)
     if bias!=0:
         cvd = tf.nn.bias_add(cvd,bias)
-    #暂时不添加dropout和正则
+
     norm_cvd = batch_norm(cvd,decay=0.9,is_training=training)
     #norm_cvd = cvd
     elu_cvd = activate_function(norm_cvd)
@@ -63,12 +63,11 @@ def calc_accuracy(logits,labels):
     return accu
 
 #优化器
-def take_optimize(loss,start_learning=0.05,end_step=10,step=10,speed=0.8,method="ADM"):
-    rate = tf.train.exponential_decay(start_learning,end_step,step,speed)
+def take_optimize(loss,learn_rate=0.1,method="ADM"):
     if method=="ADM":
         _optimize = tf.train.AdamOptimizer
 
-    return _optimize(rate).minimize(loss),rate
+    return _optimize(learn_rate).minimize(loss)
 
 #用于测试时建立的session
 def test_session(data,init=False):
