@@ -18,6 +18,7 @@ def create_bias(size,dtype=__UNIFY_FLOAT__,name="bias"):
 #封装了归一化、激活的卷积操作,数据、卷积核、偏置值、激活函数、是否是训练状态、滑动步长
 def conv2d(data,nucel,bias=0,activate_function=tf.nn.relu,training=True,strides=[1,1,1,1],PADDING='SAME'):
     #x = tf.nn.dropout(data,0.8)
+    print(nucel)
     cvd = tf.nn.conv2d(data,nucel,strides=strides,padding=PADDING)
     if bias!=0:
         cvd = tf.nn.bias_add(cvd,bias)
@@ -47,20 +48,11 @@ def calc_loss(labels,logits,back="mean",method="softmax"):
 
 #计算精确度
 def calc_accuracy(logits,labels):
-    res = []
-    """
-    for i,j in zip(logits,labels):
-        a = i if type(i)==np.ndarray else np.array(i)
-        b = j if type(j)==np.ndarray else np.array(j)
-        if(a==b).all():
-            res.append(1)
-        else:
-            res.append(0)
-    """
-    eq = tf.equal(logits,labels)
-    accu = tf.reduce_mean(tf.cast(eq,tf.int16))
-    #accu = np.mean(res)
-    return accu
+
+    logit_max = tf.argmax(logits,1)
+    label_max = tf.argmax(labels,1)
+    eq = tf.cast(tf.equal(logit_max,label_max),tf.float32)
+    return tf.reduce_mean(eq)
 
 #优化器
 def take_optimize(loss,learn_rate=0.1,method="ADM"):
