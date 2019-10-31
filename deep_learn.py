@@ -6,6 +6,14 @@ import numpy as np
 
 __UNIFY_FLOAT__ = tf.float32
 
+class __Basic_net__(object):
+    def __init__(self):
+        self.BATCH_SIZE = 300
+        self.START_LEARN_RATE = 0.1
+        self.TRAIN_CORD = {}
+        self.SAVE_PATH = 'data/model.cpkt'
+        self.CONVOL = 1
+
 
 #创建，随机生成参数
 def create_weight(size,dtype=__UNIFY_FLOAT__,name="weight"):
