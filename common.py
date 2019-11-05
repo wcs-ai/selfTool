@@ -142,6 +142,23 @@ def get_batch(data,data_num=None,batch=1):
         j = j + batch
         yield batch_res
 
+#用于训练rnn网络的数据的特别batch
+def rnn_batch(data,batch=1):
+    data_len = len(data[0])
+    iter_numebr = math.ceil(data_len/batch)
+    j = 0
+    #最后一个迭代项不足batch数时也能使用
+    for c in range(iter_numebr):
+        x_batch = data[0][j:j+batch]
+        y_batch = data[1][j:j+batch]
+
+        x_sequence = [np.shape(s)[0] for s in x_batch]
+        y_sequence = [np.shape(s)[0] for s in y_batch]
+        batch_res = [x_batch,y_batch,x_sequence,y_sequence]
+
+        j = j + batch
+        yield batch_res
+
 #批量转为one_hot标签
 def one_hot(batch_label,gap=0,deep=10):
     #默认类是从0开始

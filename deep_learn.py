@@ -56,7 +56,6 @@ def calc_loss(labels,logits,back="mean",method="softmax"):
 
 #计算精确度
 def calc_accuracy(logits,labels):
-
     logit_max = tf.argmax(logits,1)
     label_max = tf.argmax(labels,1)
     eq = tf.cast(tf.equal(logit_max,label_max),tf.float32)
@@ -95,6 +94,7 @@ def check_point(save_path):
         return (True,step)
     else:
         return (False,0)
+
 
 class Cnn(object):
     #transmit a list or array that be createrd layers' arguments
