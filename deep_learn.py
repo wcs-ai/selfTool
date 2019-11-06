@@ -25,13 +25,12 @@ def create_bias(size,dtype=__UNIFY_FLOAT__,name="bias"):
 
 #封装了归一化、激活的卷积操作,数据、卷积核、偏置值、激活函数、是否是训练状态、滑动步长
 def conv2d(data,nucel,bias=0,activate_function=tf.nn.relu,training=True,strides=[1,1,1,1],PADDING='SAME'):
-    #x = tf.nn.dropout(data,0.8)
-    print(nucel)
-    cvd = tf.nn.conv2d(data,nucel,strides=strides,padding=PADDING)
+    x = tf.nn.dropout(data,0.8)
+    cvd = tf.nn.conv2d(x,nucel,strides=strides,padding=PADDING)
     if bias!=0:
         cvd = tf.nn.bias_add(cvd,bias)
 
-    norm_cvd = batch_norm(cvd,decay=0.9,is_training=training)
+    norm_cvd = batch_norm(cvd,decay=0.8,is_training=training)
     #norm_cvd = cvd
     elu_cvd = activate_function(norm_cvd)
     return elu_cvd

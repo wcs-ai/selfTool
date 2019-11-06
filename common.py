@@ -218,3 +218,16 @@ def make_pickle(file,data=None,op="save"):
         with open(file,'rb') as obj:
             res = pickle.load(obj)
         return res
+
+#填充每条数据的序列数到指定长
+def padding(data,seq_num):
+    dt = []
+    emp = [0 for j in range(200)]
+    for i,ct in enumerate(data):
+        q = seq_num - len(ct)
+        assert q>=0,'seq_num must be bigly then every'
+        for c in range(q):
+            data[i].append(emp)
+            #np.append(data[i],emp)
+        dt.append(data[i])
+    return dt
