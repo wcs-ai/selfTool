@@ -5,7 +5,7 @@ import queue,os,chardet
 import numpy as np
 import math
 
-threads = []
+__threads = []
 #多线程
 class c_thread(threading.Thread):
     def __init__(self):
@@ -17,11 +17,11 @@ class c_thread(threading.Thread):
 
 def start_thread(num):
     for i in range(num):
-        threads.append(c_thread())
-        threads[i].start()
+        __threads.append(c_thread())
+        __threads[i].start()
 
 def stop_thread():
-    for c in threads:
+    for c in __threads:
         c.join()
 
 #查看字符使用的编码格式
@@ -222,9 +222,9 @@ def make_pickle(file,data=None,op="save"):
         return res
 
 #填充每条数据的序列数到指定长
-def padding(data,seq_num):
+def padding(data,seq_num,seq_len=200):
     dt = []
-    emp = [0 for j in range(200)]
+    emp = [0 for j in range(seq_len)]
     for i,ct in enumerate(data):
         q = seq_num - len(ct)
         assert q>=0,'seq_num must be bigly then every'

@@ -2,34 +2,47 @@
 # # -*- coding: UTF-8 -*-
 import tensorflow as tf
 from tensorflow.contrib.layers.python.layers import batch_norm
+from tensorflow.contrib.seq2seq import *
+from tensorflow.python.layers.core import Dense
 import numpy as np
 
 __UNIFY_FLOAT__ = tf.float32
 
 class __Basic_net__(object):
-    def __argument():
-        info = {
-            "batch":200,
+    def __init__(self):
+        self._info = { 
+            "batch":120,
+            "start_learn":1e-3,
             "save_path":'data/',
-            "start_learn":1e-3
-        }
-        return info    
+            "unify_float":tf.float32,
+            "sequence_length":200
+        } 
+
+    @property
+    def arg(self):
+        return self._info
+    @arg.setter
+    def arg(self,key,val):
+        self._info[key] = val
+
+    def initial(self,sess):
+        sess.run(tf.global_variables_initializer())
 
     #低版本tensorflow没有该激活函数，自己封装的。
-    def Swish(x,beta=1):
+    def Swish(self,x,beta=1):
         return x*tf.nn.sigmoid(x*beta)
 
     #创建，随机生成参数
-    def create_weight(size,dtype=__UNIFY_FLOAT__,name="weight"):
+    def create_weight(self,size,dtype=__UNIFY_FLOAT__,name="weight"):
         res = tf.truncated_normal(size,stddev=0.2,mean=1,dtype=dtype)
         return tf.Variable(res,dtype=dtype)
 
-    def create_bias(size,dtype=__UNIFY_FLOAT__,name="bias"):
+    def create_bias(self,size,dtype=__UNIFY_FLOAT__,name="bias"):
         bias = tf.constant(0.1,shape=size,dtype=dtype,name=name)
         return tf.Variable(bias,dtype=dtype,name=name)
 
     #检查模型是否保存，及其迭代次数
-    def check_point(save_path):
+    def check_point(self,save_path):
         #若保存，路径下会有一个checkpoint文件
         kpt = tf.train.latest_checkpoint(save_path)
         if kpt!=None:
@@ -39,13 +52,13 @@ class __Basic_net__(object):
         else:
             return (False,0)
     #优化器
-    def take_optimize(loss,learn_rate=0.1,method="ADM"):
+    def take_optimize(self,loss,learn_rate=0.1,method="ADM"):
         if method=="ADM":
             _optimize = tf.train.AdamOptimizer
         return _optimize(learn_rate).minimize(loss)
 
     #计算损失值
-    def calc_loss(labels,logits,back="mean",method="softmax"):
+    def calc_loss(self,labels,logits,back="mean",method="softmax"):
         loss = ''
         if method=="softmax":
             loss = tf.nn.softmax_cross_entropy_with_logits(labels=labels,logits=logits)
@@ -58,7 +71,7 @@ class __Basic_net__(object):
             return tf.reduce_sum(loss)
 
     #封装了归一化、激活的卷积操作,数据、卷积核、偏置值、激活函数、是否是训练状态、滑动步长
-    def conv2d(data,nucel,bias=0,activate_function=tf.nn.relu,training=True,strides=[1,1,1,1],PADDING='SAME'):
+    def conv2d(self,data,nucel,bias=0,activate_function=tf.nn.relu,training=True,strides=[1,1,1,1],PADDING='SAME'):
         x = tf.nn.dropout(data,0.9)
         cvd = tf.nn.conv2d(x,nucel,strides=strides,padding=PADDING)
         if bias!=0:
@@ -70,17 +83,17 @@ class __Basic_net__(object):
         return elu_cvd
 
     #计算精确度
-    def calc_accuracy(logits,labels):
+    def calc_accuracy(self,logits,labels):
         logit_max = tf.argmax(logits,1)
         label_max = tf.argmax(labels,1)
         eq = tf.cast(tf.equal(logit_max,label_max),tf.float32)
         return tf.reduce_mean(eq)
 
-    def max_pool(data,ksize=[1,3,3,1],strides=[1,2,2,1]):
+    def max_pool(self,data,ksize=[1,3,3,1],strides=[1,2,2,1]):
         pool = tf.nn.max_pool(data,ksize=ksize,strides=strides,padding="SAME")
         return pool
 
-    def avg_pool(data,ksize=[1,3,3,1],stride=[1,2,2,1],PADDING='SAME'):
+    def avg_pool(self,data,ksize=[1,3,3,1],stride=[1,2,2,1],PADDING='SAME'):
         pool = tf.nn.avg_pool(data,ksize=ksize,strides=stride,padding=PADDING)
         return pool
 
@@ -98,9 +111,9 @@ def test_session(data,init=False):
 class Cnn(__Basic_net__):
     #transmit a list or array that be createrd layers' arguments
     def __init__(self):
+        __Basic_net__.__init__(self)
         self.op = 'rnn'
         self.ACTIVATE_FUNCTION = Swish
-        self.ARG = __Basic_net__.__argument()
 
     def multi_layer(self,data,weights,biass):
         argument_num = len(biass)
@@ -151,14 +164,16 @@ class Rnn(object):
 #使用新版接口构建的seq2seq模型
 class Seq2seq(__Basic_net__):
     def __init__(self,encoder_input,decoder_input,hidden_size=3,unite=60,inference=False):
+        __Basic_net__.__init__(self)
         self.enp = encoder_input
         self.dep = decoder_input
+
         self.INFERENCE = inference
         self.HIDDEN_NUM = hidden_size
         self.CELL_UNITE = unite
+
         self.encode_result = ''
         self.encode_state = ''
-        self.ARG = __Basic_net__.__argument()
 
         self.encode_cell = self.cell()
         self.decode_cell = self.cell()
@@ -166,12 +181,12 @@ class Seq2seq(__Basic_net__):
 
     def encoder(self):
         #用动态rnn构建,encode_state的维度为[batchsize,num_units]
-        self.encode_result,self.encode_state = tf.nn.dynamic_rnn(self.encode_cell,self.enp,dtype=UNIFY_FLOAT)
+        self.encode_result,self.encode_state = tf.nn.dynamic_rnn(self.encode_cell,self.enp,dtype=self._info['unify_float'])
 
     def decoder(self,seq_length,model="decoder",start_token=None,end_token=None):
         #为decode层构建一个全连接层，得出每个序列后在乘以该全连接层，把最后的维度转为vocab_len而不是unite数
         #project_layer = tf.layers.Dense(units=200,kernel_initializer=tf.truncated_normal_initializer(mean=0.0, stddev=0.1))
-        project_layer = Dense(200)
+        project_layer = Dense(self.arg['sequence_length'])
         if not self.INFERENCE:
             #seq_len = tf.placeholder(tf.int32, shape=[None], name='batch_seq_length')
             #sequence_length:当前batch中每条数据的序列数量，超出的话会报错：Tried to read from index 20 but array size is: 20
@@ -182,7 +197,7 @@ class Seq2seq(__Basic_net__):
             train_deocde = BasicDecoder(cell=self.decode_cell,helper=helper,output_layer=project_layer,initial_state=self.encode_state)
         else:
             train_deocde = BasicDecoder(cell=self.decode_cell,helper=helper,output_layer=project_layer,
-                initial_state=self.decode_cell.zero_state(10,tf.float32))
+                initial_state=self.decode_cell.zero_state(self.arg['batch'],tf.float32))
         #final_sequence_lengths是一个一维数组，每一条数据的序列数量。
         logits,final_state,final_sequence_lengths = dynamic_decode(train_deocde,output_time_major=True,impute_finished=True)
         return logits,final_state,final_sequence_lengths
