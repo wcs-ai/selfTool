@@ -111,6 +111,8 @@ def divide_data(x,y,val=0.8):
         "test_y":y[-test_len:]
     }
     return data
+
+    
 #test the precision about two target
 def precision(x,y):
     if isinstance(x,np.ndarray):
