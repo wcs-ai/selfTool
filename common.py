@@ -4,7 +4,7 @@ import threading
 import queue,os,chardet
 import numpy as np
 import math
-
+import copy
 __threads = []
 #多线程
 class c_thread(threading.Thread):
@@ -223,13 +223,15 @@ def make_pickle(file,data=None,op="save"):
 
 #填充每条数据的序列数到指定长
 def padding(data,seq_num,seq_len=200):
+    datas = copy.deepcopy(data)
     dt = []
     emp = [0 for j in range(seq_len)]
-    for i,ct in enumerate(data):
+    for i,ct in enumerate(datas):
         q = seq_num - len(ct)
-        assert q>=0,'seq_num must be bigly then every'
+
+        assert q>=0,'len(ct):{},that is lenly then seq_num:{}'.format(len(ct),seq_num)
         for c in range(q):
-            data[i].append(emp)
-            #np.append(data[i],emp)
-        dt.append(data[i])
+            datas[i].append(emp)
+            #np.append(datas[i],emp)
+        dt.append(datas[i])
     return dt

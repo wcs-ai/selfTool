@@ -7,7 +7,7 @@
 import numpy as np
 import pandas as pd
 from sklearn import preprocessing
-
+import json
 
 class dispose(object):
 	"""docstring for ClassName"""
@@ -137,8 +137,8 @@ def divide_tencent_vector():
 
 #利用9个腾讯词向量json文件将汉字转为词向量,不占用内存的使用方法(内存低于16g时使用)
 def words_to_vector(file,name):
-    path = 'couplet/'+ file +'_'+name+'_cut.npy'
-    save_path = 'couplet/'+file+'_'+name+'_vector'
+    path = 'G:/web/pythonKU/couplet/'+ file +'_'+name+'_cut.npy'
+    save_path = 'G:/web/pythonKU/couplet/'+file+'_'+name+'_vector'
     data_in = np.load(path,allow_pickle=True)
 
     zero_index = []
@@ -162,7 +162,7 @@ def words_to_vector(file,name):
     }
 
     def read_tencent(ord):
-        path = 'data/tencent_vector'+ str(ord) +'.json'
+        path = 'G:/web/pythonKU/data/tencent_vector'+ str(ord) +'.json'
         with open(path,'r') as f:
             data = json.load(f)
         return data
@@ -207,3 +207,4 @@ def words_to_vector(file,name):
     np.save(save_path,res)
     #test_in:empety words:1313
     #test_out:empety words:2280
+words_to_vector('train','in')
