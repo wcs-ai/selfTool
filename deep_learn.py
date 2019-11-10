@@ -10,6 +10,7 @@ __UNIFY_FLOAT__ = tf.float32
 
 class __Basic_net__(object):
     def __init__(self):
+        self.MODEL = 'basic_net'
         self._info = { 
             "batch":120,
             "start_learn":1e-3,
@@ -161,9 +162,42 @@ class Cnn(__Basic_net__):
         #return last_res
 
 #普通的循环神经网络构建
-class Rnn(object):
+class Rnn(__Basic_net__):
     def __init__(self):
-        print('rnn')
+        __Basic_net__.init(self)
+        self.MODEL = 'Rnn'
+
+    def multi_cell(self,layers=3,cell_type='GRU',unite=60):
+        multi = []
+        for i in range(layers):
+            if cell_type=='GRU':
+                multi.append(tf.contrib.rnn.GRUCell(unite))
+            else:
+                multi.append(tf.contrib.rnn.LSTMCell(unite))
+        return multi
+
+    def rnn_net(self,data,sequence,layers=3,net_type='static',cell_type='GRU'):
+        mcell = self.multi_cell(layers,cell_type)
+        if net_type=='static':
+            result,state = tf.contrib.rnn.static_rnn(mcell,inputs=data,sequence_length=sequence,
+                dtype=self._info['unify_float'],initial_state=None)
+        else:
+            result,state = tf.nn.dynamic_rnn(cell,inputs=data,sequence_length=sequence,
+                dtype=self._info['unify_float'],initial_state=None)
+        return result,state
+
+    def twin_rnn(self,data,sequence,net_type='static'):
+        bw_cell = self.multi_cell()
+        fw_cell = self.multi_cell()
+
+        if net_type=='static':
+            result,_bs,_fs = tf.contrib.rnn.stack_bidirectional_rnn([bw_cell],[fw_cell],data,sequence,
+                    dtype=self._info['unify_float'])
+        else:
+            result,_bs,_fs = tf.contrib.rnn.stack_bidirectional_dynamic_rnn([bw_cell],[fw_cell],data,sequence,
+                    dtype=self._info['unify_float'])
+        
+
 
 
 #使用新版接口构建的seq2seq模型
@@ -227,19 +261,20 @@ class Seq2seq(__Basic_net__):
 
 
 #text-cnn模型
-
-class TextCnn(__Basic_net__):
+"""
+class TextCnn(__Basic_net__,Cnn):
     def __init__(self):
         __Basic_net__.__init__(self)
+        Cnn.__init__(self)
         self.MODEL = "TextCnn"
         self.ACTIVATE_FUN = tf.nn.softplus
 
     def multi_layer(self,data,weights,bias,last=False,mp_stride=[1,1,1,1]):
         layers = []
         for i,wg in enumerate(weights):
-            convol = deep_learn.conv2d(data,wg,bias=bias,activate_function=tf.nn.softplus)
+            convol = self.conv2d(data,wg,bias=bias,activate_function=tf.nn.softplus)
             if last==False:
-                pool = deep_learn.max_pool(convol,strides=mp_stride)
+                pool = self.max_pool(convol,strides=mp_stride)
                 layers.append(pool)
             else:
                 layers.append(convol)
@@ -254,12 +289,12 @@ class TextCnn(__Basic_net__):
         for wg,ba in zip(weights,bias):
             if type(wg)==list or type(wg)==tuple:
                 for w,b in zip(wg,ba):
-                    convol = deep_learn.conv2d(data,w,b,self.ACTIVATE_FUN)
-                pool = deep_learn.max_pool(convol,mp_stride)
+                    convol = self.conv2d(data,w,b,self.ACTIVATE_FUN)
+                pool = self.max_pool(convol,mp_stride)
                 layers.append(pool)
             else:
-                convol = deep_learn.conv2d(data,wg,ba,self.ACTIVATE_FUN)
-                pool = deep_learn.max_pool(convol,mp_stride)
+                convol = self.conv2d(data,wg,ba,self.ACTIVATE_FUN)
+                pool = self.max_pool(convol,mp_stride)
                 layers.append(pool)
         concat = tf.concat(layers,3)
         return concat
@@ -279,7 +314,8 @@ class TextCnn(__Basic_net__):
                 is_last = False
             leanr_result = self.layer(leanr_result,w,b,is_last,ms)
         #全局平均池化层
-        avg_res = deep_learn.avg_pool(leanr_result,ksize,stride=ksize)
+        avg_res = self.avg_pool(leanr_result,ksize,stride=ksize)
         #all_connect = tf.contrib.layers.fully_connected(res_shape,15,tf.nn.sigmoid)
         return tf.reshape(avg_res,shape)
         #return leanr_result
+"""        

@@ -46,6 +46,14 @@ class dispose(object):
 		self.take_data_after = arr_drop
 
 
+#求两点间距离
+def point_distance(x,y):
+    a = x if type(x)==np.ndarray else np.array(x)
+    b = y if type(y)==np.ndarray else np.array(y)
+
+    c = np.sum(np.square(x-y))
+    return np.sqrt(c)
+
 #数据规范化
 def norm_data(data,query_shape,method='norm'):
 	shape = np.shape(data)
@@ -77,8 +85,8 @@ def norm_data(data,query_shape,method='norm'):
 
 
 #将腾讯的词向量文件分成9个json文件
-def divide_tencent_vector():
-    file = open('G:/cnWords/Tencent_AILab_ChineseEmbedding.txt','r',encoding='utf-8')
+def divide_tencent_vector(tencent_path):
+    file = open(tencent_path,'r',encoding='utf-8')
     save_path = "data/tencent_vector"
     WORDER_NUM = 1000000
     #1000000
@@ -136,10 +144,8 @@ def divide_tencent_vector():
 
 
 #利用9个腾讯词向量json文件将汉字转为词向量,不占用内存的使用方法(内存低于16g时使用)
-def words_to_vector(file,name):
-    path = 'G:/web/pythonKU/couplet/'+ file +'_'+name+'_cut.npy'
-    save_path = 'G:/web/pythonKU/couplet/'+file+'_'+name+'_vector'
-    data_in = np.load(path,allow_pickle=True)
+def words_to_vector(open_path,save_path,tencent_path):
+    data_in = np.load(open_path,allow_pickle=True)
 
     zero_index = []
     for u,val in enumerate(data_in):
@@ -162,7 +168,7 @@ def words_to_vector(file,name):
     }
 
     def read_tencent(ord):
-        path = 'G:/web/pythonKU/data/tencent_vector'+ str(ord) +'.json'
+        path = tencent_path+'tencent_vector'+ str(ord) +'.json'
         with open(path,'r') as f:
             data = json.load(f)
         return data
@@ -207,4 +213,5 @@ def words_to_vector(file,name):
     np.save(save_path,res)
     #test_in:empety words:1313
     #test_out:empety words:2280
-words_to_vector('train','in')
+
+
