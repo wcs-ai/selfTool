@@ -6,8 +6,7 @@ from tensorflow.contrib.seq2seq import *
 from tensorflow.python.layers.core import Dense
 import numpy as np
 
-__UNIFY_FLOAT__ = tf.float32
-
+_UNIFY_FLOAT = tf.float32
 class __Basic_net__(object):
     def __init__(self):
         self.MODEL = 'basic_net'
@@ -36,11 +35,11 @@ class __Basic_net__(object):
         return x*tf.nn.sigmoid(x*beta)
 
     #创建，随机生成参数
-    def create_weight(self,size,dtype=__UNIFY_FLOAT__,name="weight"):
+    def create_weight(self,size,dtype=_UNIFY_FLOAT,name="weight"):
         res = tf.truncated_normal(size,stddev=0.2,mean=1,dtype=dtype)
         return tf.Variable(res,dtype=dtype)
 
-    def create_bias(self,size,dtype=__UNIFY_FLOAT__,name="bias"):
+    def create_bias(self,size,dtype=_UNIFY_FLOAT,name="bias"):
         bias = tf.constant(0.1,shape=size,dtype=dtype,name=name)
         return tf.Variable(bias,dtype=dtype,name=name)
 
@@ -164,7 +163,7 @@ class Cnn(__Basic_net__):
 #普通的循环神经网络构建
 class Rnn(__Basic_net__):
     def __init__(self):
-        __Basic_net__.init(self)
+        __Basic_net__.__init__(self)
         self.MODEL = 'Rnn'
 
     def multi_cell(self,layers=3,cell_type='GRU',unite=60):
@@ -174,19 +173,20 @@ class Rnn(__Basic_net__):
                 multi.append(tf.contrib.rnn.GRUCell(unite))
             else:
                 multi.append(tf.contrib.rnn.LSTMCell(unite))
-        return multi
+        mcell = tf.contrib.rnn.MultiRNNCell(multi)
+        return mcell
 
-    def rnn_net(self,data,sequence,layers=3,net_type='static',cell_type='GRU'):
+    def rnn_net(self,data,sequence,layers=3,net_type='dynamic',cell_type='GRU'):
         mcell = self.multi_cell(layers,cell_type)
         if net_type=='static':
             result,state = tf.contrib.rnn.static_rnn(mcell,inputs=data,sequence_length=sequence,
                 dtype=self._info['unify_float'],initial_state=None)
         else:
-            result,state = tf.nn.dynamic_rnn(cell,inputs=data,sequence_length=sequence,
+            result,state = tf.nn.dynamic_rnn(mcell,inputs=data,sequence_length=sequence,
                 dtype=self._info['unify_float'],initial_state=None)
         return result,state
 
-    def twin_rnn(self,data,sequence,net_type='static'):
+    def twin_rnn(self,data,sequence,net_type='dynamic'):
         bw_cell = self.multi_cell()
         fw_cell = self.multi_cell()
 
