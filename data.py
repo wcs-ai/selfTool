@@ -51,7 +51,7 @@ def point_distance(x,y):
     a = x if type(x)==np.ndarray else np.array(x)
     b = y if type(y)==np.ndarray else np.array(y)
 
-    c = np.sum(np.square(x-y))
+    c = np.sum(np.square(a-b))
     return np.sqrt(c)
 
 #数据规范化
@@ -147,13 +147,14 @@ def divide_tencent_vector(tencent_path):
 def words_to_vector(open_path,save_path,tencent_path):
     data_in = np.load(open_path,allow_pickle=True)
 
+    #按照原数据结构，构建一个维数完全相同的数组，即使原数据未对齐
     zero_index = []
     for u,val in enumerate(data_in):
         zero_index.append([])
         for t in val:
             zero_index[u].append(0)
 
-    
+    #save data that tencent's vector
     words_obj = {}
     tencent_file = {
         "t1":1,
@@ -168,11 +169,11 @@ def words_to_vector(open_path,save_path,tencent_path):
     }
 
     def read_tencent(ord):
-        path = tencent_path+'tencent_vector'+ str(ord) +'.json'
+        path = tencent_path+'tc'+ str(ord) +'.json'
         with open(path,'r') as f:
             data = json.load(f)
         return data
-        
+    #将所有要查找的词都放到words_obj中去
     for a,item in enumerate(data_in):
         for b,word in enumerate(item):
             if word not in words_obj:
@@ -180,7 +181,7 @@ def words_to_vector(open_path,save_path,tencent_path):
 
             words_obj[word].append([a,b])
 
-    
+    #逐个打开腾讯文件
     for f in range(1,10):
         key = 't' + str(f)
         
@@ -202,9 +203,10 @@ def words_to_vector(open_path,save_path,tencent_path):
             del words_obj[dw]
         print('step:'+str(f))
 
+    #未能找到的词
     empty_vector = [0 for em in range(200)]
     print('empety words:%d'%len(words_obj.keys()))
-
+    #未找到的词用0代替
     for et in words_obj:
         for c in words_obj[et]:
             zero_index[c[0]][c[1]] = empty_vector

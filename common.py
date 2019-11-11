@@ -235,3 +235,33 @@ def padding(data,seq_num,seq_len=200):
             #np.append(datas[i],emp)
         dt.append(datas[i])
     return dt
+
+#发送邮件
+"""
+{
+    info:'dsdfa',
+    from:'wu',
+    to:'ll',
+    title:'',
+    email:'19565...'
+}
+"""
+def send_email(info):
+    import smtplib
+    from email.mime.text import MIMEText
+    from email.header import Header
+    #罗婷：'2513879704@qq.com'
+    sender = "18313746328@qq.com"
+    receivers = [info['email']] 
+
+    
+    message = MIMEText(info['info'],'plain','utf-8')
+    message['From'] = Header(info['from'],"utf-8")#发件人项
+    message['To'] = Header(info['to'],'utf-8')#收件人
+
+    message['subject'] = Header(info['title'],'utf-8')#邮件标题
+
+
+    smtpObj = smtplib.SMTP('smtp.qq.com',25)
+    smtpObj.login(sender,"mdmiylsovcthdjfd")
+    smtpObj.sendmail(sender,receivers,message.as_string())

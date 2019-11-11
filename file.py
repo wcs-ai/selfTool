@@ -1,9 +1,9 @@
 #!/usr/bin/python
 #-*-coding:UTF-8-*-
 import os,queue
-from SELF_TOOLS import common
+from selfTool import common
 import jieba
-
+import json,pickle
 
 class statistics_document(object):
     """docstring for read_file"""
@@ -96,3 +96,23 @@ class statistics_document(object):
             return (doc_list,doc_obj)
         else:    
             return (doc_list,all_obj)
+
+#make json or pickle to save file or read file.
+def op_file(file_path,data=None,model='json',method='save',):
+    res = 'ok'
+    if model=='json':
+        mh = 'w' if method=='save' else 'r'
+        with open(file_path,mh) as js:
+            if method=='save':
+                json.dump(data,js)
+            else:
+                res = json.load(js)
+    else:
+        mh = 'wb' if method=='save' else 'rb'
+        with open(file_path,mh) as pk:
+            if method=='save':
+                pickle.dump(data,pk)
+            else:
+                res = pickle.load(pk)
+    return res
+

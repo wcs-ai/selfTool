@@ -196,9 +196,8 @@ class Rnn(__Basic_net__):
         else:
             result,_bs,_fs = tf.contrib.rnn.stack_bidirectional_dynamic_rnn([bw_cell],[fw_cell],data,sequence,
                     dtype=self._info['unify_float'])
+        return result
         
-
-
 
 #使用新版接口构建的seq2seq模型
 class Seq2seq(__Basic_net__):
