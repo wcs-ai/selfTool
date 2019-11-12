@@ -116,3 +116,19 @@ def op_file(file_path,data=None,model='json',method='save',):
                 res = pickle.load(pk)
     return res
 
+# 获取一个文件夹下的所有文件
+def get_all_files(path):
+    files = []
+    def get_file(path):
+        assert os.path.exists(path) == True, 'not found target path'
+        assert os.path.isfile(path) == False, "target is't a package"
+        bags = os.listdir(path)
+        for file in bags:
+            _p = os.path.join(path, file)
+            if os.path.isfile(_p):
+                files.append(_p)
+            else:
+                get_file(_p)
+    get_file(path)
+    #返回的是所有文件的路径
+    return files

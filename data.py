@@ -9,14 +9,13 @@ import pandas as pd
 from sklearn import preprocessing
 import json
 
-class dispose(object):
+class Dispose(object):
 	"""docstring for ClassName"""
-	def __init__(self, data):
+	def __init__(self,data):
 		#super(ClassName, self).__init__()
-		self.data = np.array(data)
+		self._data = np.array(data)
 		self.take_data_after = ''
 		sp = np.shape(data)
-		assert len(sp)==2,'sape must be 2'
 		self.shape = sp
 
 
@@ -26,14 +25,13 @@ class dispose(object):
 		#大于3倍平方差的变为缺失值
 		if algorithm=='gaussan':
 			for i in clm:
-				std = np.std(self.data[:,i])
-				self.data[self.data[:,i]>3*std] = None
-
+				std = np.std(self._data[:,i])
+				self._data[self._data[:,i]>3*std] = None
 
 	#take missing value			
 	def takeNone(self,method='del'):
 		arr_drop = None
-		arr = pd.DataFrame(self.data)
+		arr = pd.DataFrame(self._data)
 		#delete the row that include None
 		if method=='del':
 			for j in range(len(self.shape[1])):
@@ -44,6 +42,34 @@ class dispose(object):
 			for n in range(len(self.shape[1])):
 				print(n)
 		self.take_data_after = arr_drop
+
+    #插值
+    def interpolate(self,data,method='mean',missing_value=[None],window=3):
+
+        dt = np.array(data)
+        def mean(a,b):
+            target = data[a][b-window:b] + data[a][b+1:b+window]
+            save = []
+            for i in target:
+                if i in missing_value:
+                    continue
+                else:
+                    save.append(i)
+            res = np.mean(save,axis=0)
+            return res
+
+        
+        for miss in missing_value:
+            for idx,val in enumerate(dt):
+                if miss in val:
+                    mis_idx = val.index(miss)
+                    data[idx][mis_idx] = mean(idx,mis_idx)
+        return data
+
+
+
+
+
 
 
 #求两点间距离
