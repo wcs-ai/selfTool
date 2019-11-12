@@ -16,7 +16,9 @@ class __Basic_net__(object):
             "save_path":'data/',
             "unify_float":tf.float32,
             "sequence_length":200,
-            "epoch":50
+            "epoch":50,
+            "activate_function":self.Swish,
+            "unites":[20,50,80,100,60,30,15]
         } 
 
     @property
@@ -42,6 +44,10 @@ class __Basic_net__(object):
     def create_bias(self,size,dtype=_UNIFY_FLOAT,name="bias"):
         bias = tf.constant(0.1,shape=size,dtype=dtype,name=name)
         return tf.Variable(bias,dtype=dtype,name=name)
+    #全连接层,一般用于最后一层，默认不使用激活函数
+    def fully_connect(self,data,dim,fun=None):
+        v = tf.contrib.layers.fully_connected(data,dim,fun)
+        return v
 
     #检查模型是否保存，及其迭代次数
     def check_point(self,save_path):
@@ -166,15 +172,15 @@ class Rnn(__Basic_net__):
         __Basic_net__.__init__(self)
         self.MODEL = 'Rnn'
 
-    def multi_cell(self,layers=3,cell_type='GRU',unite=60):
+    def multi_cell(self,layers=3,cell_type='GRU'):
         multi = []
-        for i in range(layers):
+        for i in self._info['unites']:
             if cell_type=='GRU':
-                multi.append(tf.contrib.rnn.GRUCell(unite))
+                multi.append(tf.contrib.rnn.GRUCell(i))
             else:
-                multi.append(tf.contrib.rnn.LSTMCell(unite))
+                multi.append(tf.contrib.rnn.LSTMCell(i))
         mcell = tf.contrib.rnn.MultiRNNCell(multi)
-        return mcell
+        return tf.nn.rnn_cell.DropoutWrapper(mcell,0.9,0.9)
 
     def rnn_net(self,data,sequence,layers=3,net_type='dynamic',cell_type='GRU'):
         mcell = self.multi_cell(layers,cell_type)

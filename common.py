@@ -28,22 +28,7 @@ def stop_thread():
 def look_encode(obj):
     v = chardet.detect(obj)
     return v['encoding']
-# 获取一个文件夹下的所有文件
-def get_all_files(path):
-    files = []
-    def get_file(path):
-        assert os.path.exists(path) == True, 'not found target path'
-        assert os.path.isfile(path) == False, "target is't a package"
-        bags = os.listdir(path)
-        for file in bags:
-            _p = os.path.join(path, file)
-            if os.path.isfile(_p):
-                files.append(_p)
-            else:
-                get_file(_p)
-    get_file(path)
-    #返回的是所有文件的路径
-    return files
+
 
 
 #去除停用词,typ:cn为中文，en为英文
@@ -148,6 +133,8 @@ def get_batch(data,data_num=None,batch=1):
 def rnn_batch(data,batch=1):
     data_len = len(data[0])
     iter_numebr = math.ceil(data_len/batch)
+
+    #未对齐的数据也能使用
     j = 0
     #最后一个迭代项不足batch数时也能使用
     for c in range(iter_numebr):
@@ -155,7 +142,10 @@ def rnn_batch(data,batch=1):
         y_batch = data[1][j:j+batch]
 
         x_sequence = [np.shape(s)[0] for s in x_batch]
-        y_sequence = [np.shape(s)[0] for s in y_batch]
+        if len(np.shape(data[1]))<2:
+            y_sequence = [0 for c in range(batch)]
+        else:
+            y_sequence = [np.shape(s)[0] for s in y_batch]
         batch_res = [x_batch,y_batch,x_sequence,y_sequence]
 
         j = j + batch
@@ -208,18 +198,6 @@ def calc_nucleus_width(out_width,input_width,step,method="VALID"):
     if method=="VALID":
         nucleus_width = input_width - (out_width*step - 1)
     return nucleus_width
-
-#使用pickle模块存取数据
-def make_pickle(file,data=None,op="save"):
-    import pickle
-    res = ''
-    if op=="save":
-        with open(file,'wb') as obj:
-            pickle.dump(data,obj,protocol=None)
-    else:
-        with open(file,'rb') as obj:
-            res = pickle.load(obj)
-        return res
 
 #填充每条数据的序列数到指定长
 def padding(data,seq_num,seq_len=200):
