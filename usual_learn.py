@@ -70,7 +70,7 @@ class Layer_kmeans(object):
 
 		class_data = {}
 
-		one = cluster.pop(0)
+		one = clusters.pop(0)
 		km = KMeans(init="k-means++",n_clusters=one)
 		km.fit_predict(data)
 		points = []
@@ -79,16 +79,16 @@ class Layer_kmeans(object):
 			key = 'file'+str(j)
 			points.append(list(i))
 			class_data[key] = {}
-		 _kmeans_tree['center_point'] = points
+		_kmeans_tree['center_point'] = points
 
 		#将所有数据按类分开,存成字典
 		for a,b in enumerate(km.labels_):
-			key2 = 'file' + str(a)
+			key2 = 'file' + str(b)
 			class_data[key2][words[a]] = data[a]
 
 		#各类存到不同的文件
 		for idx in range(one):
-			key1 = 'file' = str(idx)
+			key1 = 'file' + str(idx)
 			save_path = 'data/tree' + str(idx) + '.json'
 			_kmeans_tree['festival'][key1] = save_path 
 			file.op_file(file_path=save_path,data=class_data[key1],model='json',method='save')
@@ -116,7 +116,7 @@ class Layer_kmeans(object):
 		*	},{...},...]
 		*}
 		"""
-
+ 
 	#参数：聚类数据、类数，当前层位置
 	def _basic_cluster(self,data,keys,tree_obj,position=0):
 
