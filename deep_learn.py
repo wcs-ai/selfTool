@@ -104,7 +104,7 @@ class Cnn(__Basic_net__):
     def __init__(self):
         __Basic_net__.__init__(self)
         self.op = 'rnn'
-        self.ACTIVATE_FUNCTION = Swish
+        self.ACTIVATE_FUNCTION = self.Swish
 
     #封装了归一化、激活的卷积操作,数据、卷积核、偏置值、激活函数、是否是训练状态、滑动步长
     def conv2d(self,data,nucel,bias=0,activate_function=tf.nn.relu,training=True,strides=[1,1,1,1],PADDING='SAME'):
@@ -118,17 +118,6 @@ class Cnn(__Basic_net__):
         elu_cvd = activate_function(norm_cvd)
         return elu_cvd    
 
-    def multi_layer(self,data,weights,biass):
-        argument_num = len(biass)
-        layer_res = data
-        i = 0
-        for w,b in zip(weights,biass):
-            if i==argument_num-1:
-                layer_res = conv2d(layer_res,w,b,activate_function=self.ACTIVATE_FUNCTION)
-            else:
-                cvd = conv2d(layer_res,w,b)
-                layer_res = max_pool(cvd)
-        return layer_res
 
 
     #返回最大池化结果和，最大值位置
@@ -162,7 +151,7 @@ class Cnn(__Basic_net__):
 
     def run(self,data,weights,biass,ksize,shape):
         last_res = self.multi_layer(data,weights,biass)
-        avg = avg_pool(last_res,ksize,stride=ksize)
+        avg = self.avg_pool(last_res,ksize,stride=ksize)
         return tf.reshape(avg,shape)
         #return last_res
 
@@ -266,7 +255,7 @@ class Seq2seq(__Basic_net__):
 
 
 #text-cnn模型
-"""
+
 class TextCnn(__Basic_net__,Cnn):
     def __init__(self):
         __Basic_net__.__init__(self)
@@ -274,21 +263,7 @@ class TextCnn(__Basic_net__,Cnn):
         self.MODEL = "TextCnn"
         self.ACTIVATE_FUN = tf.nn.softplus
 
-    def multi_layer(self,data,weights,bias,last=False,mp_stride=[1,1,1,1]):
-        layers = []
-        for i,wg in enumerate(weights):
-            convol = self.conv2d(data,wg,bias=bias,activate_function=tf.nn.softplus)
-            if last==False:
-                pool = self.max_pool(convol,strides=mp_stride)
-                layers.append(pool)
-            else:
-                layers.append(convol)
-
-        #在第3个维度连接
-        concat = tf.concat(layers,3)
-        return concat
-
-    def layer(self,data,weights,bias,last=False,mp_stride=[1,1,1,1]):
+    def txt_layer(self,data,weights,bias,last=False,mp_stride=[1,1,1,1]):
         #权重个数必须与偏置个数一一对应。
         layers = []
         for wg,ba in zip(weights,bias):
@@ -305,7 +280,7 @@ class TextCnn(__Basic_net__,Cnn):
         return concat
 
 #数据，权重列表[[w1,w2],[w1,w2]]，偏置列表[b1,b2]，平均池化滤波器，结果形状，最大池化滑动步长
-    def run(self,data,weights,biass,ksize,shape,mp_stride):
+    def txt_run(self,data,weights,biass,ksize,shape,mp_stride):
         convol_arr = []
         lg = len(biass)
         i = 0
@@ -317,10 +292,8 @@ class TextCnn(__Basic_net__,Cnn):
                 is_last = True
             else:
                 is_last = False
-            leanr_result = self.layer(leanr_result,w,b,is_last,ms)
+            leanr_result = self.txt_layer(leanr_result,w,b,is_last,ms)
         #全局平均池化层
         avg_res = self.avg_pool(leanr_result,ksize,stride=ksize)
         #all_connect = tf.contrib.layers.fully_connected(res_shape,15,tf.nn.sigmoid)
         return tf.reshape(avg_res,shape)
-        #return leanr_result
-"""        
