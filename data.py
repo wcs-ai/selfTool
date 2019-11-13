@@ -41,13 +41,9 @@ class Dispose(object):
 			arr_null = arr.notnull()
 			for n in range(len(self.shape[1])):
 				print(n)
-		self.take_data_after = arr_drop
-
-    #插值
-    def interpolate(self,data,method='mean',missing_value=[None],window=3):
-
-        dt = np.array(data)
-        def mean(a,b):
+		#self.take_data_after = arr_drop
+    
+    def _mean(self,a,b,window=3):
             target = data[a][b-window:b] + data[a][b+1:b+window]
             save = []
             for i in target:
@@ -58,17 +54,14 @@ class Dispose(object):
             res = np.mean(save,axis=0)
             return res
 
-        
+    def interpolate(self,data,method='mean',missing_value=[None],window=3):
+        dt = np.array(data)
         for miss in missing_value:
             for idx,val in enumerate(dt):
                 if miss in val:
                     mis_idx = val.index(miss)
-                    data[idx][mis_idx] = mean(idx,mis_idx)
+                    data[idx][mis_idx] = self._mean(idx,mis_idx,window)
         return data
-
-
-
-
 
 
 

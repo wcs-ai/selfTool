@@ -60,7 +60,7 @@ class Layer_kmeans(object):
 	def result(self):
 		return self._cluster_tree
 
-	#arguments:the target data(mast be 2d),words with data,
+	#arguments:the target data(mast be 2d),words with data,先分为9个类存为文件
 	def tencent(self,data,words,clusters=[5]):
 		_kmeans_tree = {
 			"position":"root",
@@ -97,6 +97,39 @@ class Layer_kmeans(object):
 		#存储根节点查找文件
 		file.op_file(file_path='data/root.json',data=_kmeans_tree,model='json',method='save')
 	
+	def take9_file(self,root_path):
+		root = file.op_file(root_path,method='read')
+		file_tree = {
+			"tree0":0,
+			"tree1":0,
+			"tree2":0,
+			"tree3":0,
+			"tree4":0,
+			"tree5":0,
+			"tree6":0,
+			"tree7":0,
+			"tree8":0
+		}
+		for f in root['festival']:
+			ord = int(f[4])
+			key = 'tree' + str(ord)
+
+			file_tree[key] = file.op_file(root['festival'][f],method='read')
+			vals = list(file_tree[key].values())
+			ks = list(file_tree[key].keys())
+
+			sp = 'data/tencent/search_tree' + str(ord) + '.json'
+			self.cluster(vals,ks,sp)
+			del file_tree[key]
+			del self._cluster_tree
+
+			self._cluster_tree = {
+					"position":'root',
+					"festival":[],
+					"center_point":None
+				}
+			print(ord)
+
 
 	#这里开以开多线程操作,info with data(如果内存够用的话)
 	def cluster(self,data,keys,save_path):
