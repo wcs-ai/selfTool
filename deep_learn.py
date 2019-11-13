@@ -256,9 +256,8 @@ class Seq2seq(__Basic_net__):
 
 #text-cnn模型
 
-class TextCnn(__Basic_net__,Cnn):
+class TextCnn(Cnn):
     def __init__(self):
-        __Basic_net__.__init__(self)
         Cnn.__init__(self)
         self.MODEL = "TextCnn"
         self.ACTIVATE_FUN = tf.nn.softplus

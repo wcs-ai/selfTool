@@ -142,10 +142,8 @@ def rnn_batch(data,batch=1):
         y_batch = data[1][j:j+batch]
 
         x_sequence = [np.shape(s)[0] for s in x_batch]
-        if len(np.shape(data[1]))<2:
-            y_sequence = [0 for c in range(batch)]
-        else:
-            y_sequence = [np.shape(s)[0] for s in y_batch]
+     
+        y_sequence = [np.shape(s)[0] for s in y_batch]
         batch_res = [x_batch,y_batch,x_sequence,y_sequence]
 
         j = j + batch

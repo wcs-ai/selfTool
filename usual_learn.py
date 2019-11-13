@@ -97,6 +97,7 @@ class Layer_kmeans(object):
 		#存储根节点查找文件
 		file.op_file(file_path='data/root.json',data=_kmeans_tree,model='json',method='save')
 	
+	#处理腾讯的9个词向量文件
 	def take9_file(self,root_path):
 		root = file.op_file(root_path,method='read')
 		file_tree = {
@@ -192,15 +193,39 @@ class Layer_kmeans(object):
 			#至此一个循环完成
 			tree_obj['festival'] = dts
 
+	#从腾讯词向量中查找相似
+	def search_tencent(self,dts,root_path,branch=5,candidate=1,distance=3):
+		root = file.op_file(root_path,method='read')
+		dist = {}
+		for idx,i in enumerate(root['center_point']):
+			val = data.point_distance(dts,i)
+			dist[round(val,3)] = idx
+
+		keys = list(dist.keys())
+		keys.sort()
+		sel_point = len(root['center_point']) if len(root['center_point'])<branch else branch
+
+		all_res = []
+		for j in range(sel_point):
+			k = 'file' + str(dist[keys[j]])
+			path = root['festival'][k]
+			sr = self.similirity(dts,path,branch,candidate,distance)
+			all_res.extend(sr)
+
+		boult = [g for g in sorted(all_res,key=lambda k:k[0],reverse=False)]
+		save_len = candidate if candidate<len(boult) else len(boult)
+		return boult[0:save_len]
+
 	#查找相似数据，data,file,查找最近的两个分支，最多保留5个值,最大匹配距离，超过该值则剔除
 	def similirity(self,data,file_path,branch=2,candidate=5,distance=5):
 		self._max_dist = distance
 		self._search_branch = branch
 		self._search_result = []
+
 		result = file.op_file(file_path,model='json',method='read')
 		self.search_tree(data,result)
 
-		sr = [c[1] for c in sorted(self._search_result,key=lambda k:k[0],reverse=False)]
+		sr = [c for c in sorted(self._search_result,key=lambda k:k[0],reverse=False)]
 		save_len = candidate if candidate<len(sr) else len(sr)
 		return sr[0:save_len]
 
