@@ -10,65 +10,83 @@ from sklearn import preprocessing
 import json
 
 class Dispose(object):
-	"""docstring for ClassName"""
-	def __init__(self,data):
-		#super(ClassName, self).__init__()
-		self._data = np.array(data)
-		self.take_data_after = ''
-		sp = np.shape(data)
-		self.shape = sp
+    def __init__(self):
+        self.MODEL = 'data-dispose'
+        self.data_type = [list,tuple,np.ndarray,pd.core.frame.DataFrame]
+        self.dim = 2
+        self.miss_val = [None]
+        self.place = 0
+    @property
+    def miss(self):
+        return self.miss_val
+    @miss.setter
+    def miss(self,val):
+        self.miss_val = val
 
+    def search_miss(self,data):
+        miss_index_arr = []
+        #允许的数据类型
+        for v1,val1 in enumerate(data):
+            if type(val1) in self.data_type:
+                self.dim = 2
+                for v2,val2 in enumerate(val1):
+                    if list(val2) in self.miss_val:
+                        miss_index_arr.append([v1,v2])
+            else:
+                self.dim = 1
+                if val1 in self.miss_val:
+                    miss_index_arr.append(v1)
+        return miss_index_arr
 
-	#unusual number to None
-	def figure_to_None(self,columns='all',algorithm='gaussan'):
-		clm = range(len(self.shape[1])) if columns=='all' else columns
-		#大于3倍平方差的变为缺失值
-		if algorithm=='gaussan':
-			for i in clm:
-				std = np.std(self._data[:,i])
-				self._data[self._data[:,i]>3*std] = None
+    def _mean(self,data,idx,window=3):
+        #统一传来的数据都是一维的
+        val = []
+        val.extend(data[idx - window:idx])
+        val.extend(data[idx + 1:idx + window])
+        save = []
+        for i in val:
+            if list(i) in self.miss_val:
+                continue
+            else:
+                save.append(i)
+        if len(save)==0:
+            res = self.place
+        else:
+            res = np.mean(save, axis=0)
+        return res
 
-	#take missing value			
-	def takeNone(self,method='del'):
-		arr_drop = None
-		arr = pd.DataFrame(self._data)
-		#delete the row that include None
-		if method=='del':
-			for j in range(len(self.shape[1])):
-				arr_drop = arr.dropna(axis=0)
-		elif method=='lagrange':
-			#notnull()将数据转为True，False表示
-			arr_null = arr.notnull()
-			for n in range(len(self.shape[1])):
-				print(n)
-		self.take_data_after = arr_drop
+    #对给定缺失值类型进行插值，arguments:插值时依据的数据维度、插值方法、没有好的插值方案时使用的占位值
+    def interpolate(self,data,axis=1,method="mean",place=None):
+        self.place = place
+        if type(data)==list or type(data)==tuple:
+            dt = np.array(data)
+        elif type(data)==pd.core.frame.DataFrame:
+            dt = np.array(data.values)
+        else:
+            dt = data
 
-    #插值
-    def interpolate(self,data,method='mean',missing_value=[None],window=3):
-
-        dt = np.array(data)
-        def mean(a,b):
-            target = data[a][b-window:b] + data[a][b+1:b+window]
-            save = []
-            for i in target:
-                if i in missing_value:
-                    continue
+        miss_idx = self.search_miss(dt)
+        for val in miss_idx:
+            if self.dim==1:
+                send_dt = dt
+                pt = val
+            else:
+                if axis==0:
+                    send_dt = dt[val[0]]
+                    pt = val[1]
                 else:
-                    save.append(i)
-            res = np.mean(save,axis=0)
-            return res
+                    send_dt = dt[:,val[1]]
+                    pt = val[0]
+            #判断插值方法
+            if method=='mean':
+                res = self._mean(send_dt,pt)
 
-        
-        for miss in missing_value:
-            for idx,val in enumerate(dt):
-                if miss in val:
-                    mis_idx = val.index(miss)
-                    data[idx][mis_idx] = mean(idx,mis_idx)
-        return data
-
-
-
-
+            #将结果插入数据中
+            if self.dim==1:
+                dt[val] = res
+            else:
+                dt[val[0]][val[1]] = res
+        return dt
 
 
 
@@ -227,6 +245,7 @@ def words_to_vector(open_path,save_path,tencent_path):
         del tencent_file[key]
         for dw in mated_words:
             del words_obj[dw]
+
         print('step:'+str(f))
 
     #未能找到的词
