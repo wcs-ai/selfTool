@@ -216,8 +216,8 @@ class Seq2seq(__Basic_net__):
         #用动态rnn构建,encode_state的维度为[batchsize,num_units]
         self.encode_result,self.encode_state = tf.nn.dynamic_rnn(self.encode_cell,self.enp,dtype=self._info['unify_float'])
 
-    def decoder(self,seq_length,state_batch=200,model="decoder",start_token=None,end_token=None):
-        #为decode层构建一个全连接层，得出每个序列后在乘以该全连接层，把最后的维度转为vocab_len而不是unite数
+    def decoder(self,seq_length=None,state_batch=200,model="decoder",start_token=None,end_token=1):
+        #为decode层构建一个全连接层，得出每个序列后在乘以该全连接层，把最后的维度转为vocab_len而不是unite数.end_token需要int型
         #project_layer = tf.layers.Dense(units=200,kernel_initializer=tf.truncated_normal_initializer(mean=0.0, stddev=0.1))
         project_layer = Dense(self.arg['sequence_length'])
         if not self.INFERENCE:
@@ -226,16 +226,19 @@ class Seq2seq(__Basic_net__):
             helper = TrainingHelper(self.dep,seq_length,time_major=False)
         else:
             helper = GreedyEmbeddingHelper(self.dep,start_token,end_token)
+
         if model=="decoder":
             train_deocde = BasicDecoder(cell=self.decode_cell,helper=helper,output_layer=project_layer,initial_state=self.encode_state)
         else:
             state=self.decode_cell.zero_state(state_batch[0],dtype=tf.float32)
+            # if self.INFERENCE==True:
+            #     state = tf.reshape(state,[-1,1,100])
             train_deocde = BasicDecoder(cell=self.decode_cell,helper=helper,output_layer=project_layer,initial_state=state)
         #final_sequence_lengths是一个一维数组，每一条数据的序列数量。
-        logits,final_state,final_sequence_lengths = dynamic_decode(train_deocde,output_time_major=True,impute_finished=True)
+        logits,final_state,final_sequence_lengths = dynamic_decode(train_deocde,output_time_major=True,impute_finished=False)
         return logits,final_state,final_sequence_lengths
 
-    def attention_decoder(self,encode_seq_num,state_batch,decode_seq_num):
+    def attention_decoder(self,encode_seq_num,state_batch,decode_seq_num=None,start_token=None):
         #num_units与cell中的num_units一致，用于一个全连接权重的列数,与encode层的cell的num_units一样大小。
         attention_mechanism = LuongAttention(num_units=self.CELL_UNITE,memory=self.encode_result,memory_sequence_length=encode_seq_num)
         #alignment_history表示每一步的alignment是否存储到state中，tenrsorbord可视化时可用,
@@ -243,7 +246,8 @@ class Seq2seq(__Basic_net__):
         self.decode_cell = AttentionWrapper(cell=self.decode_cell,attention_mechanism=attention_mechanism,
             attention_layer_size=None,alignment_history=False)
 
-        logits,final_state,final_sequence_lengths = self.decoder(decode_seq_num,state_batch,model="attention_decoder")
+        logits,final_state,final_sequence_lengths = self.decoder(decode_seq_num,state_batch,
+                        model="attention_decoder",start_token=start_token)
         return logits
  
     def cell(self):
