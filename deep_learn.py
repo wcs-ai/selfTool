@@ -248,7 +248,7 @@ class Seq2seq(__Basic_net__):
 
         logits,final_state,final_sequence_lengths = self.decoder(decode_seq_num,state_batch,
                         model="attention_decoder",start_token=start_token)
-        return logits
+        return logits,final_state,final_sequence_lengths
  
     def cell(self):
         cells = []
