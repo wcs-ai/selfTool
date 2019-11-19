@@ -216,7 +216,7 @@ class Seq2seq(__Basic_net__):
         #用动态rnn构建,encode_state的维度为[batchsize,num_units]
         self.encode_result,self.encode_state = tf.nn.dynamic_rnn(self.encode_cell,self.enp,dtype=self._info['unify_float'])
 
-    def decoder(self,seq_length=None,state_batch=200,model="decoder",start_token=None,end_token=0):
+    def decoder(self,seq_length=None,state_batch=10,model="decoder",start_token=None,end_token=0):
         #为decode层构建一个全连接层，得出每个序列后在乘以该全连接层，把最后的维度转为vocab_len而不是unite数.end_token需要int型
         #project_layer = tf.layers.Dense(units=200,kernel_initializer=tf.truncated_normal_initializer(mean=0.0, stddev=0.1))
         project_layer = Dense(self.arg['sequence_length'])
@@ -230,11 +230,11 @@ class Seq2seq(__Basic_net__):
         if model=="decoder":
             train_deocde = BasicDecoder(cell=self.decode_cell,helper=helper,output_layer=project_layer,initial_state=self.encode_state)
         else:
+            #生成一个二维的状态数据:[batch_size,num_unit]
             state=self.decode_cell.zero_state(batch_size=state_batch,dtype=tf.float32)
-            # if self.INFERENCE==True:
-            #     state = tf.reshape(state,[-1,1,100])
+
             train_deocde = BasicDecoder(cell=self.decode_cell,helper=helper,output_layer=project_layer,initial_state=state)
-        #final_sequence_lengths是一个一维数组，每一条数据的序列数量。
+        #final_sequence_lengths是一个一维数组，每一条数据的序列数量。output_time_major为False时输出是[batch,seq_num,dim]
         logits,final_state,final_sequence_lengths = dynamic_decode(train_deocde,output_time_major=False,impute_finished=False)
         return logits,final_state,final_sequence_lengths
 
