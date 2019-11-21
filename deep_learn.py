@@ -233,14 +233,18 @@ class Seq2seq(__Basic_net__):
             #生成一个二维的状态数据:[batch_size,num_unit]
             beamSearch = 4
             if beamSearch>1:
-                memory = tf.contrib.seq2seq.tile_batch(self.encode_state, multiplier=beamSearch)
-                decoder_initial_state = self.decode_cell.zero_state(16, tf.float32).clone(cell_state=memory)
-          
-                start_token = tf.ones([beamSearch], dtype=tf.int32) * start_token
-                train_deocde = tf.contrib.seq2seq.BeamSearchDecoder(self.decode_cell, self.dep, start_token, end_token,  
-                    decoder_initial_state, beam_width=beamSearch, output_layer=project_layer)
+                memory = tile_batch(self.encode_state, multiplier=beamSearch)
+                #print(memory) [4,?,100]
+                decoder_initial_state = self.decode_cell.zero_state(batch_size=beamSearch,dtype=tf.float32)
+                decoder_initial_state = decoder_initial_state.clone(cell_state=memory)
+
+                #start_token = tf.ones([beamSearch], dtype=tf.int32) * start_token
+                #start_token = tf.fill([1],end_token)
+
+                train_deocde = BeamSearchDecoder(cell=self.decode_cell,embedding=self.dep,start_tokens=start_token,end_token=end_token,
+                                    initial_state=decoder_initial_state,beam_width=beamSearch, output_layer=project_layer)
             else:
-                state=self.decode_cell.zero_state(batch_size=state_batch,dtype=tf.float32)
+                state = self.decode_cell.zero_state(batch_size=state_batch,dtype=tf.float32)
                 train_deocde = BasicDecoder(cell=self.decode_cell,helper=helper,output_layer=project_layer,initial_state=state)
 
         #final_sequence_lengths是一个一维数组，每一条数据的序列数量。output_time_major为False时输出是[batch,seq_num,dim]
@@ -250,8 +254,8 @@ class Seq2seq(__Basic_net__):
     def attention_decoder(self,encode_seq_num,state_batch,decode_seq_num=None,start_token=None):
         #num_units与cell中的num_units一致，用于一个全连接权重的列数,与encode层的cell的num_units一样大小。
         
-        self.encode_result = tf.contrib.seq2seq.tile_batch(self.encode_result,multiplier=4)
-        encode_seq_num = tf.contrib.seq2seq.tile_batch(encode_seq_num,multiplier=4)
+        self.encode_result = tile_batch(self.encode_result,multiplier=4)
+        encode_seq_num = tile_batch(encode_seq_num,multiplier=4)
 
         attention_mechanism = LuongAttention(num_units=self.CELL_UNITE,memory=self.encode_result,memory_sequence_length=encode_seq_num)
         #alignment_history表示每一步的alignment是否存储到state中，tenrsorbord可视化时可用,
