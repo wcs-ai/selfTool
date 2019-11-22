@@ -98,7 +98,7 @@ class statistics_document(object):
             return (doc_list,all_obj)
 
 #make json or pickle to save file or read file.
-def op_file(file_path,data=None,model='json',method='save',):
+def op_file(file_path,data=None,model='json',method='save'):
     res = 'ok'
     if model=='json':
         mh = 'w' if method=='save' else 'r'
