@@ -213,7 +213,11 @@ def padding(data,seq_num,seq_len=200):
 
         assert q>=0,'len(ct):{},that is lenly then seq_num:{}'.format(len(ct),seq_num)
         for c in range(q):
-            datas[i].append(emp)
+            if type(datas)==np.ndarray:
+                np.append(datas[i],emp)
+            else:
+                datas[i].append(emp)
+            
             #np.append(datas[i],emp)
         dt.append(datas[i])
     return dt

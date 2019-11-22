@@ -253,10 +253,16 @@ class Seq2seq(__Basic_net__):
                                         length_penalty_weight=1.0)
             else:
                 state = self.decode_cell.zero_state(batch_size=state_batch,dtype=tf.float32)
-                train_deocde = BasicDecoder(cell=self.decode_cell,helper=helper,output_layer=project_layer,initial_state=state)
+                train_deocde = BasicDecoder(cell=self.decode_cell,
+                                            helper=helper,
+                                            output_layer=project_layer,
+                                            initial_state=state)
 
         #final_sequence_lengths是一个一维数组，每一条数据的序列数量。output_time_major为False时输出是[batch,seq_num,dim]
-        logits,final_state,final_sequence_lengths = dynamic_decode(train_deocde,output_time_major=False,impute_finished=False,maximum_iterations=100)
+        logits,final_state,final_sequence_lengths = dynamic_decode(train_deocde,
+                                                                output_time_major=False,
+                                                                impute_finished=True,
+                                                                maximum_iterations=tf.reduce_max(seq_length))
         return logits,final_state,final_sequence_lengths
 
     def attention_decoder(self,encode_seq_num,state_batch,decode_seq_num=None,start_token=None):
