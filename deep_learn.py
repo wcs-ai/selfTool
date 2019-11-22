@@ -18,7 +18,8 @@ class __Basic_net__(object):
             "sequence_length":200,
             "epoch":50,
             "activate_function":self.Swish,
-            "unites":[20,50,80,100,60,30,15]
+            "unites":[20,50,80,100,60,30,15],
+            "beamWidth":4
         } 
 
     @property
@@ -168,6 +169,7 @@ class Rnn(__Basic_net__):
                 multi.append(tf.contrib.rnn.GRUCell(i))
             else:
                 multi.append(tf.contrib.rnn.LSTMCell(i))
+                
         mcell = tf.contrib.rnn.MultiRNNCell(multi)
         return tf.nn.rnn_cell.DropoutWrapper(mcell,0.9,0.9)
 
@@ -231,31 +233,38 @@ class Seq2seq(__Basic_net__):
             train_deocde = BasicDecoder(cell=self.decode_cell,helper=helper,output_layer=project_layer,initial_state=self.encode_state)
         else:
             #生成一个二维的状态数据:[batch_size,num_unit]
-            beamSearch = 4
-            if beamSearch>1:
-                memory = tile_batch(self.encode_state, multiplier=beamSearch)
+
+            if self._info['beamWidth']>1:
+                memory = tile_batch(self.encode_state, multiplier=self._info['beamWidth'])
                 #print(memory) [4,?,100]
-                decoder_initial_state = self.decode_cell.zero_state(batch_size=beamSearch,dtype=tf.float32)
+                decoder_initial_state = self.decode_cell.zero_state(batch_size=self._info['beamWidth'],dtype=tf.float32)
                 decoder_initial_state = decoder_initial_state.clone(cell_state=memory)
 
-                #start_token = tf.ones([beamSearch], dtype=tf.int32) * start_token
+                #start_token = tf.ones([self._info['beamWidth']], dtype=tf.int32) * start_token
                 #start_token = tf.fill([1],end_token)
 
-                train_deocde = BeamSearchDecoder(cell=self.decode_cell,embedding=self.dep,start_tokens=start_token,end_token=end_token,
-                                    initial_state=decoder_initial_state,beam_width=beamSearch, output_layer=project_layer)
+                train_deocde = BeamSearchDecoder(cell=self.decode_cell,
+                                        embedding=self.dep,
+                                        start_tokens=tf.fill([1], 0),
+                                        end_token=end_token,
+                                        initial_state=decoder_initial_state,
+                                        beam_width=self._info['beamWidth'], 
+                                        output_layer=project_layer,
+                                        length_penalty_weight=1.0)
             else:
                 state = self.decode_cell.zero_state(batch_size=state_batch,dtype=tf.float32)
                 train_deocde = BasicDecoder(cell=self.decode_cell,helper=helper,output_layer=project_layer,initial_state=state)
 
         #final_sequence_lengths是一个一维数组，每一条数据的序列数量。output_time_major为False时输出是[batch,seq_num,dim]
-        logits,final_state,final_sequence_lengths = dynamic_decode(train_deocde,output_time_major=False,impute_finished=False)
+        logits,final_state,final_sequence_lengths = dynamic_decode(train_deocde,output_time_major=False,impute_finished=False,maximum_iterations=100)
         return logits,final_state,final_sequence_lengths
 
     def attention_decoder(self,encode_seq_num,state_batch,decode_seq_num=None,start_token=None):
         #num_units与cell中的num_units一致，用于一个全连接权重的列数,与encode层的cell的num_units一样大小。
-        
-        self.encode_result = tile_batch(self.encode_result,multiplier=4)
-        encode_seq_num = tile_batch(encode_seq_num,multiplier=4)
+
+        if self._info['beamWidth']>1:
+            self.encode_result = tile_batch(self.encode_result, multiplier=self._info['beamWidth'])
+            encode_seq_num = tile_batch(encode_seq_num, multiplier=self._info['beamWidth'])
 
         attention_mechanism = LuongAttention(num_units=self.CELL_UNITE,memory=self.encode_result,memory_sequence_length=encode_seq_num)
         #alignment_history表示每一步的alignment是否存储到state中，tenrsorbord可视化时可用,
@@ -281,7 +290,6 @@ class TextCnn(Cnn):
     def __init__(self):
         Cnn.__init__(self)
         self.MODEL = "TextCnn"
-        self.ACTIVATE_FUN = tf.nn.softplus
 
     def txt_layer(self,data,weights,bias,last=False,mp_stride=[1,1,1,1]):
         #权重个数必须与偏置个数一一对应。
@@ -289,11 +297,11 @@ class TextCnn(Cnn):
         for wg,ba in zip(weights,bias):
             if type(wg)==list or type(wg)==tuple:
                 for w,b in zip(wg,ba):
-                    convol = self.conv2d(data,w,b,self.ACTIVATE_FUN)
+                    convol = self.conv2d(data,w,b,self._info['activate_function'])
                 pool = self.max_pool(convol,mp_stride)
                 layers.append(pool)
             else:
-                convol = self.conv2d(data,wg,ba,self.ACTIVATE_FUN)
+                convol = self.conv2d(data,wg,ba,self._info['activate_function'])
                 pool = self.max_pool(convol,mp_stride)
                 layers.append(pool)
         concat = tf.concat(layers,3)
