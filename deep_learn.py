@@ -19,7 +19,7 @@ class __Basic_net__(object):
             "epoch":50,
             "activate_function":self.Swish,
             "unites":[20,50,80,100,60,30,15],
-            "beamWidth":4
+            "beamWidth":1
         } 
 
     @property
@@ -236,7 +236,7 @@ class Seq2seq(__Basic_net__):
 
             if self._info['beamWidth']>1:
                 memory = tile_batch(self.encode_state, multiplier=self._info['beamWidth'])
-                #print(memory) [4,?,100]
+                #print(memory) [4,?,100]，这里的batch_size用beamWidth*batch,以后多批预测时更改。
                 decoder_initial_state = self.decode_cell.zero_state(batch_size=self._info['beamWidth'],dtype=tf.float32)
                 decoder_initial_state = decoder_initial_state.clone(cell_state=memory)
 

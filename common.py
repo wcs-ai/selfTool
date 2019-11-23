@@ -205,7 +205,7 @@ def calc_nucleus_width(out_width,input_width,step,method="VALID"):
 
 #填充每条数据的序列数到指定长
 def padding(data,seq_num,seq_len=200):
-    datas = copy.deepcopy(data)
+    datas = copy.deepcopy(list(data))
     dt = []
     emp = [0 for j in range(seq_len)]
     for i,ct in enumerate(datas):
@@ -237,6 +237,7 @@ def send_email(info):
     from email.mime.text import MIMEText
     from email.header import Header
     #罗婷：'2513879704@qq.com'
+    #锦堰：'1609654610@qq.com'
     sender = "18313746328@qq.com"
     receivers = [info['email']] 
 
