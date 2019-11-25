@@ -109,8 +109,8 @@ class Cnn(__Basic_net__):
 
     #封装了归一化、激活的卷积操作,数据、卷积核、偏置值、激活函数、是否是训练状态、滑动步长
     def conv2d(self,data,nucel,bias=0,activate_function=tf.nn.relu,training=True,strides=[1,1,1,1],PADDING='SAME'):
-        x = tf.nn.dropout(data,0.9)
-        cvd = tf.nn.conv2d(x,nucel,strides=strides,padding=PADDING)
+        #x = tf.nn.dropout(data,0.9)
+        cvd = tf.nn.conv2d(data,nucel,strides=strides,padding=PADDING)
         if bias!=0:
             cvd = tf.nn.bias_add(cvd,bias)
 
