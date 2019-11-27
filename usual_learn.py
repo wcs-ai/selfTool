@@ -220,8 +220,8 @@ class Layer_kmeans(object):
 		save_len = candidate if candidate<len(boult) else len(boult)
 		return boult[0:save_len]
 
-	#查找相似数据，data,file,查找最近的两个分支，最多保留5个值,最大匹配距离，超过该值则剔除
-	def similirity(self,data,file_path,branchs=[2,2],candidate=5,distance=5):
+	#查找相似数据，data,file,查找最近的两个分支，最多保留2个值,最大匹配距离，超过该值则剔除
+	def similirity(self,data,file_path,branchs=[2,2],candidate=2,distance=5):
 		self._max_dist = distance
 		self._search_branch = branchs
 		self._search_result = []
