@@ -361,5 +361,4 @@ class TextCnn(Cnn):
 class Net(__Basic_net__):
     def __init__(self):
         self.MODEL = None
-    
-    
+

@@ -222,6 +222,7 @@ class Layer_kmeans(object):
 
 	#查找相似数据，data,file,查找最近的两个分支，最多保留5个值,最大匹配距离，超过该值则剔除
 	def similirity(self,data,file_path,branchs=[2,2],candidate=3,distance=15):
+
 		self._max_dist = distance
 		self._search_branch = branchs
 		self._search_result = []
