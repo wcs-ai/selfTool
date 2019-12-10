@@ -16,11 +16,13 @@ class __Basic_net__(object):
             "save_path":'data/',
             "unify_float":tf.float32,
             "sequence_length":200,
-            "epoch":50,
+            "epoch":10,
             "activate_function":self.Swish,
             "unites":[20,50,80,100,60,30,15],
-            "beamWidth":1
-        } 
+            "beamWidth":1,
+            "x":[],
+            "y":[]
+        }
 
     @property
     def arg(self):
@@ -29,6 +31,27 @@ class __Basic_net__(object):
     @arg.setter
     def arg(self,val):
         self._info[val[0]] = val[1]
+    
+    def generator_callback(self):
+        for a,b in zip(self._info['x'],self._info['y']):
+            yield a,b,len(a),len(b)
+    #使用tensorflow的data模块来导入数据
+    def load_data(self,ge_fn=None,
+                    opt=(tf.int32,tf.int32,tf.int32,tf.int32),
+                    osp=([None],[None],(),()),
+                    paddings=(0,0,0,0)):
+        
+        gf = self.generator_callback if ge_fn==None else ge_fn
+        dataset = tf.data.Dataset.from_generator(generator=gf,
+                                                output_types=opt,
+                                                output_shapes=osp)
+        dataset = dataset.repeat(self._info['epoch'])
+        dataset = dataset.padded_batch(self._info['batch'],osp,paddings)
+        iter = dataset.make_one_shot_iterator()
+
+        dt = iter.get_next()
+        return dt
+
 
     def initial(self,sess):
         sess.run(tf.global_variables_initializer())
@@ -45,6 +68,7 @@ class __Basic_net__(object):
     def create_bias(self,size,dtype=_UNIFY_FLOAT,name="bias"):
         bias = tf.constant(0.1,shape=size,dtype=dtype,name=name)
         return tf.Variable(bias,dtype=dtype,name=name)
+
     #全连接层,一般用于最后一层，默认不使用激活函数
     def fully_connect(self,data,dim,fun=None):
         v = tf.contrib.layers.fully_connected(data,dim,fun)
@@ -331,3 +355,11 @@ class TextCnn(Cnn):
         avg_res = self.avg_pool(leanr_result,ksize,stride=ksize)
         #all_connect = tf.contrib.layers.fully_connected(res_shape,15,tf.nn.sigmoid)
         return tf.reshape(avg_res,shape)
+
+
+#该类用于和非该文件的深度学习模型结合
+class Net(__Basic_net__):
+    def __init__(self):
+        self.MODEL = None
+    
+    

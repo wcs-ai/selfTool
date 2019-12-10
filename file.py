@@ -1,9 +1,10 @@
 #!/usr/bin/python
 #-*-coding:UTF-8-*-
 import os,queue
-from selfTool import common
 import jieba
 import json,pickle
+from selfTool import common as cm
+#cm = __import__('common')
 
 class statistics_document(object):
     """docstring for read_file"""
@@ -30,7 +31,7 @@ class statistics_document(object):
                 datas.put(self.file_arr[j:])
             j += dt
         #启动线程    
-        common.start_thread(self.cd_num)
+        cm.start_thread(self.cd_num)
         #get value from quee (get a value every one)
         for que in range(self.cd_num):
             q_data = datas.get()
@@ -44,7 +45,7 @@ class statistics_document(object):
                 #self.words_list.append(res)
                 #返回一个可迭代对象
                 yield (res,obj)
-        common.stop_thread()        
+        cm.stop_thread()        
 
         
     #分词、去除停用词、返回词列表，传入一段文字
@@ -59,7 +60,7 @@ class statistics_document(object):
             all_words = text.split()
         
         #去除停用词    
-        all_words = common.stop_word(all_words,typ=self.typ)
+        all_words = cm.stop_word(all_words,typ=self.typ)
         return all_words
     #统计每个词的词频    
     def calc_wordsNum(self,words_list):
@@ -132,3 +133,30 @@ def get_all_files(path):
     get_file(path)
     #返回的是所有文件的路径
     return files
+
+#test all encodeing type to decode a byte
+def decode_byte(bt,decode=None):
+    encodings = ['utf-8','utf-16','utf-32','ascii','Windows-1254','GBK','gb2312','Base64','hex','BIG5','EUC-KR','cp932']
+    test = cm.look_encode(bt) or 'utf-8'
+
+    def _dec(st):
+        try:
+            rq = bt.decode(st)
+            return rq
+        except:
+            return False
+
+    try:
+        res = bt.decode(test)
+        return res
+    except:
+        for i in encodings:
+            td = _dec(i)
+            if td!=False:
+                return td
+                break
+        return False
+
+
+
+
