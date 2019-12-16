@@ -8,6 +8,8 @@ import numpy as np
 import pandas as pd
 from sklearn import preprocessing
 import json
+import math
+import copy
 
 class Dispose(object):
     def __init__(self):
@@ -97,6 +99,66 @@ def point_distance(x,y):
     c = np.sum(np.square(a-b))
     return np.sqrt(c)
 
+
+#打乱数据
+def shufle_data(x,y):
+    lg = np.arange(0,len(y))
+    np.random.shuffle(lg)
+    res_x = x[lg]
+    res_y = y[lg]
+    return (res_x,res_y)
+
+#将数据集划分为训练集和测试集
+def divide_data(x,y,val=0.8):
+    lg = len(y)
+    train_len = round(lg*0.8)
+    test_len = lg - train_len
+
+    data = {
+        "train_x":x[0:train_len],
+        "test_x":x[-test_len:],
+        "train_y":y[0:train_len],
+        "test_y":y[-test_len:]
+    }
+    return data
+
+
+#批量读取数据的迭代器。
+def get_batch(data,data_num=None,batch=1):
+    data_len = len(data[0])
+    iter_numebr = math.ceil(data_len/batch)
+    j = 0
+    #最后一个迭代项不足batch数时也能使用
+    for c in range(iter_numebr):
+        batch_res = [i[j:j+batch] for i in data]
+        j = j + batch
+        yield batch_res
+
+#用于训练rnn网络的数据的特别batch
+def rnn_batch(data,batch=1):
+    data_len = len(data[0])
+    iter_numebr = math.ceil(data_len/batch)
+
+    tp = [list,tuple,np.ndarray]
+    #未对齐的数据也能使用
+    j = 0
+    #最后一个迭代项不足batch数时也能使用 
+    for c in range(iter_numebr):
+        x_batch = data[0][j:j+batch]
+        y_batch = data[1][j:j+batch]
+
+        x_sequence = [np.shape(s)[0] for s in x_batch]
+        
+        if type(y_batch[0]) in tp:
+            y_sequence = [np.shape(s)[0] for s in y_batch]
+        else:
+            y_sequence = [0 for c in range(batch)]
+        
+        batch_res = [x_batch,y_batch,x_sequence,y_sequence]
+
+        j = j + batch
+        yield batch_res
+
 #数据规范化
 def norm_data(data,query_shape,method='norm'):
 	shape = np.shape(data)
@@ -126,6 +188,24 @@ def norm_data(data,query_shape,method='norm'):
 	res_data = np.reshape(take_data,shape)
 	return res_data
 
+#填充每条数据的序列数到指定长
+def padding(data,seq_num,pad=0):
+    datas = copy.deepcopy(list(data))
+    dt = []
+
+    for i,ct in enumerate(datas):
+        q = seq_num - len(ct)
+
+        assert q>=0,'len(ct):{},that is lenly then seq_num:{}'.format(len(ct),seq_num)
+        for c in range(q):
+            if type(datas)==np.ndarray:
+                np.append(datas[i],pad)
+            else:
+                datas[i].append(pad)
+            
+            #np.append(datas[i],emp)
+        dt.append(datas[i])
+    return dt
 
 #将腾讯的词向量文件分成9个json文件
 def divide_tencent_vector(tencent_path):

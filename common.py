@@ -3,8 +3,7 @@
 import threading
 import queue,os,chardet
 import numpy as np
-import math
-import copy
+
 __threads = []
 
 #多线程
@@ -67,36 +66,7 @@ def stop_word(words,typ='cn',file_path='SELF_TOOLS/cn_stop.txt'):
 
     return arr
 
-#读取大型文件时获取指定行
-def getLine(path,method='r',ed='utf-8',ord=0):
-    i = 0
-    file = open(path,method,encoding=ed)
-    while i<ord+1:
-        line = file.readline()
-        if i==ord:
-            return line
 
-#打乱数据
-def shufle_data(x,y):
-    lg = np.arange(0,len(y))
-    np.random.shuffle(lg)
-    res_x = x[lg]
-    res_y = y[lg]
-    return (res_x,res_y)
-
-#将数据集划分为训练集和测试集
-def divide_data(x,y,val=0.8):
-    lg = len(y)
-    train_len = round(lg*0.8)
-    test_len = lg - train_len
-
-    data = {
-        "train_x":x[0:train_len],
-        "test_x":x[-test_len:],
-        "train_y":y[0:train_len],
-        "test_y":y[-test_len:]
-    }
-    return data
 
     
 #test the precision about two target
@@ -119,41 +89,6 @@ def precision(x,y):
 
  
 
-#批量读取数据的迭代器。
-def get_batch(data,data_num=None,batch=1):
-    data_len = len(data[0])
-    iter_numebr = math.ceil(data_len/batch)
-    j = 0
-    #最后一个迭代项不足batch数时也能使用
-    for c in range(iter_numebr):
-        batch_res = [i[j:j+batch] for i in data]
-        j = j + batch
-        yield batch_res
-
-#用于训练rnn网络的数据的特别batch
-def rnn_batch(data,batch=1):
-    data_len = len(data[0])
-    iter_numebr = math.ceil(data_len/batch)
-
-    tp = [list,tuple,np.ndarray]
-    #未对齐的数据也能使用
-    j = 0
-    #最后一个迭代项不足batch数时也能使用
-    for c in range(iter_numebr):
-        x_batch = data[0][j:j+batch]
-        y_batch = data[1][j:j+batch]
-
-        x_sequence = [np.shape(s)[0] for s in x_batch]
-        
-        if type(y_batch[0]) in tp:
-            y_sequence = [np.shape(s)[0] for s in y_batch]
-        else:
-            y_sequence = [0 for c in range(batch)]
-        
-        batch_res = [x_batch,y_batch,x_sequence,y_sequence]
-
-        j = j + batch
-        yield batch_res
 
 #批量转为one_hot标签
 def one_hot(batch_label,gap=0,deep=10):
@@ -203,24 +138,7 @@ def calc_nucleus_width(out_width,input_width,step,method="VALID"):
         nucleus_width = input_width - (out_width*step - 1)
     return nucleus_width
 
-#填充每条数据的序列数到指定长
-def padding(data,seq_num,seq_len=200):
-    datas = copy.deepcopy(list(data))
-    dt = []
-    emp = [0 for j in range(seq_len)]
-    for i,ct in enumerate(datas):
-        q = seq_num - len(ct)
 
-        assert q>=0,'len(ct):{},that is lenly then seq_num:{}'.format(len(ct),seq_num)
-        for c in range(q):
-            if type(datas)==np.ndarray:
-                np.append(datas[i],emp)
-            else:
-                datas[i].append(emp)
-            
-            #np.append(datas[i],emp)
-        dt.append(datas[i])
-    return dt
 
 #发送邮件
 """

@@ -313,7 +313,7 @@ class Seq2seq(__Basic_net__):
         mcell = tf.contrib.rnn.MultiRNNCell(cells)
         return mcell
 
-
+ 
 #text-cnn模型
 
 class TextCnn(Cnn):
@@ -360,5 +360,6 @@ class TextCnn(Cnn):
 #该类用于和非该文件的深度学习模型结合
 class Net(__Basic_net__):
     def __init__(self):
+        __Basic_net__.__init__(self)
         self.MODEL = None
 
