@@ -7,7 +7,9 @@ from collections import Counter
 import functools
 from gensim import corpora,models
 import math
+import numpy as np
 from jieba import analyse
+from selfTool import data,common
 
 
 """######这里是时间提取部分######"""
@@ -217,15 +219,6 @@ def count_word(word_arr):
             continue
     return res_obj
 
-"""
-def antistop(words):
-    #过滤词、停用词、统计词
-    f_words = filtration_word(words,['v','adj','m','t','x'])
-    dt = stop_word(f_words)
-    data = [x[0] for x in dt]
-
-    return data
-"""
 
 
 class TFIDF(object):
@@ -267,6 +260,7 @@ class TFIDF(object):
 
 #主题模型
 class TopicModel(object):
+    #doc_list：多文档列表
     def __init__(self,doc_list,keyword_num,model='LSI',num_topics=4):
         self.dictionary = corpora.Dictionary(doc_list)
         corpus = [self.dictionary.doc2bow(doc) for doc in doc_list]
@@ -357,6 +351,252 @@ def antistop(words_list,keyword_num=10,algorithm='TFIDF'):
         topic_model = TopicModel(words_list,keyword_num,model='LDA')
         all_list = []
         for gh in words_list:
-            all_list += gh
+            all_list += gh 
         res = topic_model.get_simword(all_list)
     return res    
+
+
+###***抽取式文本摘要***###
+class Summary(object):
+    def __init__(self,text,typ='cn'):
+      """数据说明：
+        text：一个列表，['文档1','文档2',...]多个文档
+        self._sentence:源文本句子,[[sentence1,sentence2,...],[sentence]]
+        self._txt_words:源文本词,[[[w1,w2],[w1,w2,w3],...],[]]
+        self._key_words:所有文档的关键词列表
+        self._sentence_vector:所有文档的句向量
+        self._sentence_similar:句子相似度矩阵
+      """
+      self._text = text
+      self._typ = typ
+      self._divide_alpha1 = '。' if typ=='cn' else '.'
+      self._divide_alpha2 = '；' if typ=='cn' else ';'
+      self._sentence = []
+      self._txt_words = []
+      self._vocab_count = {}
+      self._words_id = {}
+      self._key_words = []
+      self._sentence_vector = []
+      self._sentence_similar = []
+
+      self.pre_data = data.Nlp_data()
+      self.divide_text()
+    
+    #将多文档分别分句
+    def divide_text(self,text=None):
+      txt = text or self._text
+      sentence1 = [t.split(self._divide_alpha1) for t in txt]
+      sentence = []
+      for s in sentence1:
+        sen = [i.split(self._divide_alpha2) for i in s]
+        _sen = [k for j in sen for k in j]
+        sentence.append(_sen)
+      self._sentence = sentence
+    
+    #将各文档划分为1个个词
+    def divide_word(self):
+      tx = []
+      for t in self._sentence:
+        doc = []
+        for s in t:
+          doc.append(self.pre_data.word_cut(s,stop=True))
+        tx.append(doc)
+        self.pre_data.count_all(doc)
+      
+      #dim:[doc_num,sentence_num,words_num]
+      self._txt_words = tx
+      #词频字典
+      self._vocab_count = self.pre_data.rid_words(min_count=0)
+      self._words_id,_idw = self.pre_data.c_wid(save=False)
+    
+    
+    #将词转为id，转为词向量
+    def _convert(self):
+      #将所有文档联合成一个
+      all_doc = self._union(self._txt_words)
+
+      #将整篇文档转换为id表示
+      #self.pre_data.word_to_id(all_doc,back=False)
+      #ids = self.pre_data.converse_res
+
+      #用腾讯词向量转为词向量
+      empty = [0 for i in range(128)]
+      vector = data.baiki_vector(all_doc,baiki_path='G:/baike_news.bin',place=empty)
+
+      #生成句子的句向量
+      for s in vector:
+        self._sentence_vector.append(np.mean(s,axis=0))
+
+    
+    #欧式距离计算句子相似度矩阵
+    def sentence_similary(self):
+      sentence_size = len(self._sentence_vector)
+      similary_arr = np.zeros((sentence_size,sentence_size),dtype=np.float32)
+      
+      #上三角矩阵计算相似度
+      for ai,a in enumerate(self._sentence_vector):
+        for bi,b in enumerate(self._sentence_vector):
+          if bi>ai:
+            #计算余弦距离
+            similary_arr[ai][bi] = data.point_distance(a,b)
+
+      #副对角线对称实现
+      self._sentence_similar = similary_arr + similary_arr.T
+
+    #获取关键词
+    def get_key_word(self,algorithm='TFIDF',key_num=100):
+      words_list = self._union(self._txt_words)
+      input_data = '。'.join(self._text) if algorithm=='TEXTRANK' else words_list
+      self._key_words = antistop(input_data,algorithm=algorithm,keyword_num=key_num)
+
+    #将内一层的矩阵连接成一个
+    def _union(self,data):
+      m = []
+      for j in data:
+        m = m + j
+      return m
+    
+    #对句子分数排序
+    def rank_score(self,score_dict,sentences,num=4):
+      sort_score = [si[0] for si in sorted(score_dict.items(),key=lambda k: k[1],reverse=True)]
+      res = [sentences[gh] for gh in sort_score[0:num]]
+      return self._divide_alpha1.join(res) + self._divide_alpha1
+    
+    ###***以下是各种算法实现***###----------
+
+    #leader3 to create summary
+    def leader3(self):
+      us = self._union(self._sentence)
+      sumary = self._divide_alpha1.join(us[0:3]) + self._divide_alpha1
+      return sumary
+    
+    #textrank create summary
+    def textrank(self,num=5):
+      self.divide_word()
+
+      all_doc = self._union(self._txt_words)
+      doc_sentence = self._union(self._sentence)
+      bm25 = common.BM25(all_doc)
+      #各句的初始分数
+      INITIAL_SCORE = 1
+      D = 0.85
+
+      sentence_len = len(all_doc)
+      sentence_score = {ord:INITIAL_SCORE for ord in range(sentence_len)}
+
+      #textrank公式实现
+      def iter_score(scores,idx):
+        scores.pop(idx)
+        weight_sum = sum(scores)
+        
+        #过滤一些特殊情况
+        if weight_sum<=0:
+          return 0
+
+        last_score = 1
+        #每轮更新last_score的值
+        for s1 in scores:
+          score = 0
+          for s2 in scores:
+            score += last_score*s2 / weight_sum
+          last_score = 1 - D + D*score
+        return last_score
+
+      #计算每个句子的得分
+      for i,ic in enumerate(all_doc):
+        now_scores = bm25.every_score(ic)
+        _score = iter_score(now_scores,i)
+        sentence_score[i] = _score
+
+      #按分数从大到小排序
+      sumary = self.rank_score(sentence_score,doc_sentence,num=num)
+      
+      return sumary
+    
+    #基于关键词的文本摘要生成
+    def base_keyword(self,num=4):
+      self.divide_word()
+      self.get_key_word()
+      words_list = self._union(self._txt_words)
+      doc_sentence = self._union(self._sentence)
+
+      #初始化
+      INITIAL_SCORE = 0
+      CLUSTER_GAP = 5
+      SCORE_SMOOTH = 0.7
+      SUITABLE_LEN = 20
+      sentence_score = {s:INITIAL_SCORE for s in range(len(doc_sentence))}
+
+      #记录每句中关键词的位置
+      keywords_score = {w:(len(self._key_words)+1-sc) for sc,w in enumerate(self._key_words)}
+      
+      #一个倒立的，最大值在第一象限的抛物线公式。句子长度在SUITABLE_LEN左右时有较高的得分
+      len_score = lambda x: -(x-SUITABLE_LEN)**2 + 50
+      #输入句子，返回每句所有关键词总分，和位置
+      def kp(ws):
+        position_arr = []
+        score = 0
+        for ix,w in enumerate(ws):
+          if w in self._key_words:
+            score += keywords_score[w]*SCORE_SMOOTH
+            position_arr.append(ix)
+        return position_arr,score
+            
+      for si,sen in enumerate(words_list):
+        key_words_position,sen_key_score = kp(sen)
+
+        if len(key_words_position)==1:
+          sentence_score[si] = round(1/len(sen),5)
+        else:
+          #一句有多个关键词的情况
+          start = key_words_position[0] if len(key_words_position)!=0 else 0
+          keys = 1
+          for cs in range(1,len(key_words_position)):
+            if key_words_position[cs] - key_words_position[cs-1]<CLUSTER_GAP:
+              keys += 1
+              end = key_words_position[cs]
+            else:  
+              """
+              当前关键词位置与前一个关键词不构成一个簇的情况时,开始计算上一个簇分数.
+              只有一个关键词时分数都一样：1/CLUSTER_GAP
+              """
+              score = 1/CLUSTER_GAP if keys==1 else round(keys**2/(end-start),5)
+              sentence_score[si] += score
+              #更新start位置为当前位置
+              start = key_words_position[cs]
+              keys = 1
+          #对最后一个情况计算得分
+          score = 1/CLUSTER_GAP if keys==1 else round(keys**2/(end-start),5)
+          sentence_score[si] += (score + sen_key_score) / (len_score(len(sen)) + 1)
+      
+      #排序
+      sumary = self.rank_score(sentence_score,doc_sentence,num)
+      return sumary
+
+    #基于k-means的文本摘要生成
+    def km(self,num=5):
+      from sklearn.cluster import KMeans
+      self.divide_word()
+      self._convert()
+
+      doc_sentence = self._union(self._sentence)
+      kmeans = KMeans(init="k-means++",n_clusters=num)
+      kmeans.fit_predict(self._sentence_vector)
+
+      #将各句子索引分到不同的类中
+      ct = {s:[] for s in range(num)}
+      for ic,c in enumerate(kmeans.labels_):
+        ct[c].append(ic)
+      
+      ct_score = []
+      for h in ct:
+        dist_arr = {}
+        for j in ct[h]:
+          score = data.point_distance(self._sentence_vector[j],kmeans.cluster_centers_[h])
+          dist_arr[j] = score
+        ct_score.append(common.rank_dict(dist_arr,reverse=False)[0])
+
+      res = [doc_sentence[idx] for idx in ct_score]
+      return res
+      
+

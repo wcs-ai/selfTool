@@ -30,11 +30,11 @@ class Transformer:
     '''
     def __init__(self, hp):
         self.hp = hp
-        self.token2idx = fl.op_file(file_path='data/cn_words_id.json',method='read')
-        self.idx2token = fl.op_file(file_path='data/cn_id_words.json',method='read')
+        self.token2idx = {}
+        self.idx2token = {}
         #self.token2idx, self.idx2token = load_vocab(hp.vocab)
-        self.cn_embeddings = get_token_embeddings(self.hp.cn_vocab_size, self.hp.d_model, zero_pad=True)
-        self.en_embeddings = get_token_embeddings(self.hp.en_vocab_size, self.hp.d_model, zero_pad=True)
+        self.cn_embeddings = get_token_embeddings(hp.cn_vocab_size, hp.d_model, zero_pad=True)
+        self.en_embeddings = get_token_embeddings(hp.en_vocab_size, hp.d_model, zero_pad=True)
 
     @property
     def words_id(self):
@@ -63,7 +63,7 @@ class Transformer:
             enc = data*self.hp.d_model**0.5 # scale
 
             #positional_encoding内部按照输入的数据的维度生成一个embedding矩阵，目的是加上每个词id的位置id一起作为输入
-            if user_position:
+            if use_position:
               enc += positional_encoding(enc, self.hp.maxlen1)
               enc = tf.layers.dropout(enc, self.hp.dropout_rate, training=training)
             return enc

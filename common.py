@@ -3,11 +3,11 @@
 import threading
 import queue,os,chardet
 import numpy as np
+import math
 
-__threads = []
 
-#多线程
-class c_thread(threading.Thread):
+#多线程基类
+class _Multi_process(threading.Thread):
     def __init__(self):
         threading.Thread.__init__(self)
         self.result = ''
@@ -15,14 +15,22 @@ class c_thread(threading.Thread):
     def run(self):
         self.ord += 1
 
-def start_thread(num):
-    for i in range(num):
-        __threads.append(c_thread())
-        __threads[i].start()
+#使用多线程的类
+class MP(object):
+    def __init__(self,num):
+        self._threads = []
+        self._num = num
 
-def stop_thread():
-    for c in __threads:
-        c.join()
+    #使用时在start和stop间添加自己想要运行的程序。
+    def start(self):
+        for i in range(self._num):
+            self._threads.append(_Multi_process())
+            self._threads[i].start()
+    
+    def stop(self):
+        for c in self._threads:
+            c.join()
+        
 
 #查看字符使用的编码格式
 def look_encode(obj):
@@ -155,7 +163,6 @@ def send_email(info):
     from email.mime.text import MIMEText
     from email.header import Header
     #罗婷：'2513879704@qq.com'
-    #锦堰：'1609654610@qq.com'
     sender = "18313746328@qq.com"
     receivers = [info['email']] 
 
@@ -170,3 +177,261 @@ def send_email(info):
     smtpObj = smtplib.SMTP('smtp.qq.com',25)
     smtpObj.login(sender,"mdmiylsovcthdjfd")
     smtpObj.sendmail(sender,receivers,message.as_string())
+
+#对字典排序
+def rank_dict(dc,reverse=True,apply=1):
+    #apply:指定依赖于键值排序(0)还是依赖于value值排序(1)
+    sort_arr = [si[abs(apply-1)] for si in sorted(dc.items(),key=lambda k: k[apply],reverse=reverse)]
+    return sort_arr
+
+#bm25算法实现
+class BM25(object):
+    def __init__(self, docs):
+      #docs：[[w1,w2],[w1,w2,...],...]
+        self.D = len(docs)
+        self.avgdl = sum([len(doc)+0.0 for doc in docs]) / self.D
+        self.docs = docs
+        self.f = []  # 列表的每一个元素是一个dict，dict存储着一个文档中每个词的出现次数
+        self.df = {} # 存储每个词及出现了该词的文档数量
+        self.idf = {} # 存储每个词的idf值
+        self.k1 = 1.5
+        self.b = 0.75
+        self.init()
+
+    def init(self):
+        for doc in self.docs:
+            tmp = {}
+            for word in doc:
+                tmp[word] = tmp.get(word, 0) + 1  # 存储每个文档中每个词的出现次数
+            self.f.append(tmp)
+            for k in tmp.keys():
+                self.df[k] = self.df.get(k, 0) + 1
+        for k, v in self.df.items():
+            self.idf[k] = math.log(self.D-v+0.5)-math.log(v+0.5)
+
+    def sim(self, doc, index):
+        score = 0
+        for word in doc:
+            if word not in self.f[index]:
+                continue
+            d = len(self.docs[index])
+            score += (self.idf[word]*self.f[index][word]*(self.k1+1)
+                      / (self.f[index][word]+self.k1*(1-self.b+self.b*d
+                                                      / self.avgdl)))
+        return score
+
+    #doc:[w1,w2,w3,...];计算当前句与每一句的得分。返回得分列表
+    def every_score(self, doc):
+        scores = []
+        for index in range(self.D):
+            score = self.sim(doc, index)
+            scores.append(score)
+        return scores
+
+
+#HMM算法实现
+class HMM(object):
+    def __init__(self):
+        self.model_file = 'hmm_model.pkl'
+        #词首、词中、词尾、单独成词
+        self.state_list = ['B','M','E','S']
+        self.load_para = False
+    
+    #True则导入训练好的模型参数，否则初始化参数用于训练
+    def try_load_model(self,trained):
+        if trained:
+            import pickle
+            with open(self.model_file,'rb') as f:
+                self.A_dic = pickle.load(f)
+                self.B_dic = pickle.load(f)
+                self.Pi_dic = pickle.load(f)
+                self.load_para = True
+        else:
+            #状态转移概率（state->state's condition probability）
+            self.A_dic = {}
+            #发射概率（state->words' condition probability）
+            self.B_dic = {}
+            #状态的初始概率
+            self.Pi_dic = {}
+            self.load_para = False
+    
+    def train(self,path):
+        #重置几个概率矩阵
+        self.try_load_model(False)
+        #统计各标记出现总次数
+        count_dic = {}
+        """初始化参数
+        将几个标记作为键添加到3个字典中去
+        A_dic:{
+            "B":{"B":0.0,"M":0.0,"E":0.0,"S":0.0},
+            ...
+        }
+        B_dic:{
+            "B":{"字1":0,"字2":1,...}
+            ...
+        }
+        Pi_dic:{
+            "B":0.0,
+            ...
+        }
+        """
+        def init_parameters():
+            for state in self.state_list:
+                self.A_dic[state] = {s:0.0 for s in self.state_list}
+                self.Pi_dic[state] = 0.0
+                self.B_dic[state] = {}
+
+                count_dic[state] = 0
+        #传入的是一个词,返回该词对应的标记
+        def makeLabel(text):
+            out_text = []
+            #长度为1时说明改字单独成词
+            if len(text)==1:
+                out_text.append('S')
+            else:
+                #词长大于2时有词中标记，否则标记为词首，词尾。
+                out_text += ['B'] + ['M'] * (len(text) - 2) + ['E']
+            return out_text
+        
+        init_parameters()
+        line_num = -1
+        #观察者集合
+        words = set()
+        #打开训练文件，每行是一句话，每句话是已经切分好的词
+        with open(path,encoding='utf-8') as f:
+            for line in f:
+                line_num += 1
+                #无用
+                line = line.strip()
+
+                if not line:
+                    continue
+                
+                #字列表
+                word_list = [i for i in line if i!=' ']
+                words!=set(word_list)#更新字的集合
+                #词列表
+                linelist = line.split()
+                line_state = []
+
+                for w in linelist:
+                    line_state.extend(makeLabel(w))
+                #字长与标记长对应
+                assert len(word_list) == len(line_state)
+
+                for k,v in enumerate(line_state):
+                    #统计所有循环中各标记出现的频率
+                    count_dic[v] += 1
+                    if k==0:
+                        #每个句子的第一个状态用于计算初始概率
+                        self.Pi_dic[v] += 1
+                    else:
+                        """
+                        计算转移概率(该标记对应的前一个标记中的对应标记v值加1).对应公式中的p(o)=p(o1)p(o1|o2)*p(o2|o3)...
+                        发射概率(当前位置标记对应它的字的分数加1)。对应公式中的p(r|o)=p(r1|o1)*p(r2|o2)*...
+                        转移概率公式中有一个初始概率p(o1)，所以需要一个Pi_dic.
+                        所有循环完成之后即是对所有训练数据的分数累加。
+                        计算出的A_dic表示每个标记对应的后一个各标记的频率。
+                        B_dic则记录各标记对应的有哪些字及其频率。
+                        """
+                        self.A_dic[line_state[k - 1]][v] += 1
+                        self.B_dic[line_state[k]][word_list[k]] = self.B_dic[line_state[k]].get(word_list[k],0) + 1.0
+        #只有B,S标记的值不为0.
+        self.Pi_dic = {k:v * 1.0 / line_num for k,v in self.Pi_dic.items()}
+        #将频率转化为概率,B_dic中加1做平滑处理
+        self.A_dic = {k:{k1:v1 / count_dic[k] for k1,v1 in v.items()} for k,v in self.A_dic.items()}
+        self.B_dic = {k:{k1:(v1 + 1) / count_dic[k] for k1,v1 in v.items()} for k,v in self.B_dic.items()}
+
+        import pickle
+        with open(self.model_file,'wb') as f:
+            pickle.dump(self.A_dic,f)
+            pickle.dump(self.B_dic,f)
+            pickle.dump(self.Pi_dic,f)
+
+        return self
+
+    #viterbi算法
+    def viterbi(self,text,states,start_p,trans_p,emit_p):
+        """args:
+        text:一句话。
+        states:self.state_list。/[B,M,S,E]
+        start_p:初始概率。/self.Pi_dic
+        trans_p:转移概率。/self.A_dic
+        emit_p:发射概率。/self.B_dic
+        v:[{"E":12.1,"M":10.2,...}]
+        path:{"S":["S"],...}
+        """
+        v = [{}]
+        path = {}
+        for y in states:
+            #初始概率乘以发射概率
+            v[0][y] = start_p[y] * emit_p[y].get(text[0],0)
+            path[y] = [y]
+        
+        for t in range(1,len(text)):
+            v.append({})
+            newpath = {}
+            #检测训练的发射概率中是否有该字
+            neverSeen = text[t] not in emit_p['S'].keys() and \
+                        text[t] not in emit_p['M'].keys() and \
+                        text[t] not in emit_p['E'].keys() and \
+                        text[t] not in emit_p['B'].keys()
+            """
+            未知字单独成词，概率为1.0。
+            要计算每个字对应的各个标记的概率，所以需要循环整个标记列表。 
+            这里忽略了p(r)的计算,因为下面这个循环中p(r)的值是一样的。
+            """
+            for y in states:
+                #获取对应标记下对应字的发射概率
+                emitP = emit_p[y].get(text[t],0) if not neverSeen else 1.0
+                """
+                每个标记下对应的各标记的转移概率乘以该字的发射概率，再乘以前一个字的对应各标记的概率。
+                每次循环计算前一时刻(字)的不同标记概率乘以当前时刻(字)的不同标记的转移概率，然后求最大概率路径(viterbi思想)。
+                p(r|o)*p(o)=p(r1|o1)*p(o1|o2)*...
+                以下生成的值为：[(p(r1|o1)*p1*p(o1|o1),o1),
+                                (p(r1|o1)*p1*p(o1|o2),o2), 
+                                ...
+                               ]
+                """
+                (prob,state) = max([(v[t-1][y0] * trans_p[y0].get(y,0) * emitP,y0) for y0 in states if v[t-1][y0]>0])
+                #将各个字对应的各个标记的概率添加到数组v中。
+                v[t][y] = prob
+                """
+                因为上式中每次的循环计算是针对y的发射概率和转移概率，所以这里最后加 [y].
+                因为选出的最大概率情况只有四种：B,M,E,S。所以path中只用了这四种情况统计四种路径，
+                然后每次循环加上当前对应的标记y。
+                """
+                newpath[y] = path[state] + [y]
+            #path中每个路径的列表长度都一样
+            path = newpath
+        
+        #最后一个字的最大概率值及其标记 
+        if emit_p['M'].get(text[-1],0)>emit_p['S'].get(text[-1],0):
+            (prob,state) = max([(v[len(text) - 1][y],y) for y in ('E','M')])
+        else:
+            (prob,state) = max([(v[len(text) - 1][y],y) for y in states])
+        #返回选中的最大概率路径
+        return (prob,path[state])
+        
+    
+    #对传入的句子进行分词
+    def cut(self,text):
+        if not self.load_para:
+            #存在训练好的模型则导入，否则初始化
+            self.try_load_model(os.path.exists(self.model_file))
+        prob,pos_list = self.viterbi(text,self.state_list,self.Pi_dic,self.A_dic,self.B_dic)
+        begin,next_ = 0,0
+        for i,char in enumerate(text):
+            pos = pos_list[i]
+            if pos=='B':
+                begin = i
+            elif pos=='E':
+                yield text[begin:i+1]
+                next_ = i + 1
+            elif pos=='S':
+                yield char
+                next_ = i + 1
+        
+        if next_ < len(text):
+            yield text[next_:]
+    

@@ -131,7 +131,6 @@ class BertModel(object):
   def __init__(self,
                config,
                is_training,
-               input_ids,
                input_mask=None,
                token_type_ids=None,
                use_one_hot_embeddings=False,
@@ -139,7 +138,7 @@ class BertModel(object):
     """Constructor for  .
 
     Args:
-      config: `BertConfig` instance.
+      config: `BertConfig` instance,a dict.
       is_training: bool. true for training model, false for eval model. Controls
         whether dropout will be applied.
       input_ids: int32 Tensor of shape [batch_size, seq_length].
@@ -153,6 +152,7 @@ class BertModel(object):
       ValueError: The config is invalid or one of the input tensor shapes
         is invalid.
     """
+    self._scope = scope
     self.vocab_embed = []
     self.config = copy.deepcopy(config)
     if not is_training: 
@@ -167,8 +167,8 @@ class BertModel(object):
   def _vocabEmbed(self,val):
     self.vocab_embed = val
 
-  def get_input_shape(self,input_ids):
-    input_shape = get_shape_list(input_ids, expected_rank=2)
+  def get_input_shape(self,input_ids,expected_rank=None):
+    input_shape = get_shape_list(input_ids, expected_rank=expected_rank)
     batch_size = input_shape[0]
     seq_length = input_shape[1]
     return batch_size,seq_length
@@ -177,15 +177,16 @@ class BertModel(object):
     #self.create_embedding()
     #self.calc_output()
 
-  def calc_output(self,input_ids,embed=None):
+  def calc_output(self,input_ids,embed=None,input_mask=None):
     batch_size,seq_length = self.get_input_shape(input_ids)
     if input_mask is None:
       self.input_mask = tf.ones(shape=[batch_size, seq_length], dtype=tf.int32)
 
-    bert_embed = embed or self.embedding_output
+    #bert_embed = embed or self.embedding_output
 
-    with tf.variable_scope(scope, default_name="bert"):
+    with tf.variable_scope(self._scope, default_name="bert"):
       with tf.variable_scope("encoder"):
+        embed = self.create_embedding(input_ids)
         # This converts a 2D mask of shape [batch_size, seq_length] to a 3D
         # mask of shape [batch_size, seq_length, seq_length] which is used
         # for the attention scores.
@@ -196,16 +197,16 @@ class BertModel(object):
         # Run the stacked transformer.
         # `sequence_output` shape = [batch_size, seq_length, hidden_size].
         self.all_encoder_layers = transformer_model(
-            input_tensor=bert_embed,
+            input_tensor=embed,
             attention_mask=attention_mask,
-            hidden_size=config.hidden_size,
-            num_hidden_layers=config.num_hidden_layers,
-            num_attention_heads=config.num_attention_heads,
-            intermediate_size=config.intermediate_size,
-            intermediate_act_fn=get_activation(config.hidden_act),
-            hidden_dropout_prob=config.hidden_dropout_prob,
-            attention_probs_dropout_prob=config.attention_probs_dropout_prob,
-            initializer_range=config.initializer_range,
+            hidden_size=self.config['hidden_size'],
+            num_hidden_layers=self.config['num_hidden_layers'],
+            num_attention_heads=self.config['num_attention_heads'],
+            intermediate_size=self.config['intermediate_size'],
+            intermediate_act_fn=get_activation(self.config['hidden_act']),
+            hidden_dropout_prob=self.config['hidden_dropout_prob'],
+            attention_probs_dropout_prob=self.config['attention_probs_dropout_prob'],
+            initializer_range=self.config['initializer_range'],
             do_return_all_layers=True)
 
       #do_return_alL_layers为True时返回的是所有层的运行结果，所以这里需要取最后一层结果。
@@ -221,13 +222,13 @@ class BertModel(object):
         first_token_tensor = tf.squeeze(self.sequence_output[:, 0:1, :], axis=1)
         self.pooled_output = tf.layers.dense(
             first_token_tensor,
-            config.hidden_size,
+            self.config['hidden_size'],
             activation=tf.tanh,
-            kernel_initializer=create_initializer(config.initializer_range))
+            kernel_initializer=create_initializer(self.config['initializer_range']))
 
   #与create_embedding一起生成词向量，与其它模型结合使用时建议不使用该函数。
   def create_vocab_embed(self,input):
-    with tf.variable_scope(scope, default_name="bert"):
+    with tf.variable_scope(self._scope, default_name="bert"):
       with tf.variable_scope("embeddings"):
         # Perform embedding lookup on the word ids.
         self.vocab_embed, self.embedding_table = embedding_lookup(
@@ -240,26 +241,32 @@ class BertModel(object):
         return self.vocab_embed
 
   #新增的函数将，embedding部分与原流分开，容易扩展
-  def create_embedding(self,input_ids):
-    batch_size,seq_length = self.get_input_shape(input_ids)
+  def create_embedding(self,input_ids,token_type_ids=None):
+    batch_size,seq_length = self.get_input_shape(input_ids,expected_rank=2)
     if token_type_ids is None:
       self.token_type_ids = tf.zeros(shape=[batch_size, seq_length], dtype=tf.int32)
 
-    with tf.variable_scope(scope, default_name="bert"):
+    #ids_to_embedding = tf.nn.embedding_lookup(self.vocab_embed,input_ids)
+    ids_to_embedding,_table = embedding_lookup(input_ids,
+                                        vocab_size=self.config['vocab_size'],
+                                        embedding_size=self.config['hidden_size'],
+                                        initializer_range=self.config['initializer_range'])
+
+    with tf.variable_scope(self._scope, default_name="bert"):
         # Add positional embeddings and token type embeddings, then layer
         # normalize and perform dropout.
         #use_token_type,use_position_embeddings都为True表示使用:词向量+语句向量+位置向量
         self.embedding_output = embedding_postprocessor(
-            input_tensor=self.vocab_embed,
+            input_tensor=ids_to_embedding,#self.vocab_embed
             use_token_type=True,
             token_type_ids=self.token_type_ids,
-            token_type_vocab_size=self.config.type_vocab_size,
+            token_type_vocab_size=self.config['type_vocab_size'],
             token_type_embedding_name="token_type_embeddings",
             use_position_embeddings=True,
             position_embedding_name="position_embeddings",
-            initializer_range=self.config.initializer_range,
-            max_position_embeddings=self.config.max_position_embeddings,
-            dropout_prob=self.config.hidden_dropout_prob)
+            initializer_range=self.config['initializer_range'],
+            max_position_embeddings=self.config['max_position_embeddings'],
+            dropout_prob=self.config['hidden_dropout_prob'])
         
         return self.embedding_output
      
@@ -437,7 +444,7 @@ def embedding_lookup(input_ids,
   # reshape to [batch_size, seq_length, 1].
   if input_ids.shape.ndims == 2:
     input_ids = tf.expand_dims(input_ids, axis=[-1])
-
+  #name=word_embedding_name,
   embedding_table = tf.get_variable(
       name=word_embedding_name,
       shape=[vocab_size, embedding_size],
@@ -470,8 +477,7 @@ def embedding_postprocessor(input_tensor,
   """Performs various post-processing on a word embedding tensor.
 
   Args:
-    input_tensor: float Tensor of shape [batch_size, seq_length,
-      embedding_size].
+    input_tensor: float Tensor of shape [batch_size, seq_length,embedding_size].
     use_token_type: bool. Whether to add embeddings for `token_type_ids`.
     token_type_ids: (optional) int32 Tensor of shape [batch_size, seq_length].
       Must be specified if `use_token_type` is True.
@@ -494,7 +500,7 @@ def embedding_postprocessor(input_tensor,
   Raises:
     ValueError: One of the tensor shapes or input values is invalid.
   """
-  input_shape = get_shape_list(input_tensor, expected_rank=3)
+  input_shape = get_shape_list(input_tensor, expected_rank=3)#3
   batch_size = input_shape[0]
   seq_length = input_shape[1]
   width = input_shape[2]
