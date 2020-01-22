@@ -5,11 +5,13 @@ from tensorflow.contrib.layers.python.layers import batch_norm
 from tensorflow.contrib.seq2seq import *
 from tensorflow.python.layers.core import Dense
 import numpy as np
+from selfTool.bt import transformer_model
 
-_UNIFY_FLOAT = tf.float32
+
+
 class __Basic_net__(object):
+    _UNIFY_FLOAT = tf.float32
     def __init__(self):
-        self.MODEL = 'basic_net'
         self._info = { 
             "batch":120,
             "start_learn":1e-3,
@@ -40,8 +42,7 @@ class __Basic_net__(object):
                     opt=(tf.int32,tf.int32,tf.int32,tf.int32),
                     osp=([None],[None],(),()),
                     paddings=(0,0,0,0)):
-        
-        gf = self.generator_callback if ge_fn==None else ge_fn
+        gf = ge_fn if callable(ge_fn) else self.generator_callback
         dataset = tf.data.Dataset.from_generator(generator=gf,
                                                 output_types=opt,
                                                 output_shapes=osp)
@@ -61,13 +62,21 @@ class __Basic_net__(object):
         return x*tf.nn.sigmoid(x*beta)
 
     #创建，随机生成参数
-    def create_weight(self,size,dtype=_UNIFY_FLOAT,name="weight"):
-        res = tf.truncated_normal(size,stddev=0.2,mean=1,dtype=dtype)
-        return tf.Variable(res,dtype=dtype)
+    def create_weight(self,size,dtype=None,name="weight"):
+        dp = dtype or self._UNIFY_FLOAT
+        with tf.device('/cpu:0'):
+            res = tf.truncated_normal(size,stddev=0.2,mean=1,dtype=dp)
+            variable = tf.get_variable(name=name,initializer=res)
 
-    def create_bias(self,size,dtype=_UNIFY_FLOAT,name="bias"):
-        bias = tf.constant(0.1,shape=size,dtype=dtype,name=name)
-        return tf.Variable(bias,dtype=dtype,name=name)
+        return variable
+
+    def create_bias(self,size,dtype=None,name="bias"):
+        dp = dtype or self._UNIFY_FLOAT
+        with tf.device('/cpu:0'):
+            bias = tf.constant(0.1,shape=size,dtype=dp,name=name)
+            variable = tf.get_variable(name=name,initializer=bias)
+
+        return variable
 
     #全连接层,一般用于最后一层，默认不使用激活函数
     def fully_connect(self,data,dim,fun=None):
@@ -84,7 +93,7 @@ class __Basic_net__(object):
             return (True,step)
         else:
             return (False,0)
-    #优化器
+    # 优化器
     def optimize(self,loss,learn_rate=0.1,method="ADM"):
         if method=="ADM":
             _optimize = tf.train.AdamOptimizer
@@ -105,12 +114,17 @@ class __Basic_net__(object):
         else:
             return tf.reduce_sum(loss)
 
-    #计算精确度
+    # 计算精确度
     def calc_accuracy(self,logits,labels):
         logit_max = tf.argmax(logits,1)
         label_max = tf.argmax(labels,1)
         eq = tf.cast(tf.equal(logit_max,label_max),tf.float32)
         return tf.reduce_mean(eq)
+    
+    def decay_epoch(self,num,epoch,batch,val=0.9):
+        # 返回一个合适的衰退学习率步数。
+        _a = (num * val) // batch
+        return _a * epoch
 
     
 
@@ -128,19 +142,20 @@ class Cnn(__Basic_net__):
     #transmit a list or array that be createrd layers' arguments
     def __init__(self):
         __Basic_net__.__init__(self)
+        self._MODEL = "CNN"
         self.op = 'rnn'
         self.ACTIVATE_FUNCTION = self.Swish
 
     #封装了归一化、激活的卷积操作,数据、卷积核、偏置值、激活函数、是否是训练状态、滑动步长
     def conv2d(self,data,nucel,bias=0,activate_function=tf.nn.relu,training=True,strides=[1,1,1,1],PADDING='SAME'):
-        #x = tf.nn.dropout(data,0.9)
+        # x = tf.nn.dropout(data,0.9)
         cvd = tf.nn.conv2d(data,nucel,strides=strides,padding=PADDING)
         if bias!=0:
             cvd = tf.nn.bias_add(cvd,bias)
 
         norm_cvd = batch_norm(cvd,decay=0.9,is_training=training)
-        #norm_cvd = cvd
-        elu_cvd = activate_function(norm_cvd)
+        # norm_cvd = cvd
+        elu_cvd = norm_cvd if activate_function==None else activate_function(norm_cvd)
         return elu_cvd    
 
 
@@ -165,26 +180,135 @@ class Cnn(__Basic_net__):
             print(1)
         else:
             pass
+    
+    # 用于生成多层cnn模型使用的参数。
+    def c_cnn_params(self,weight_width,channels,dtype=tf.float32):
+        """args:
+        weight_width:width of weights every layer.[3,2,3,4,5,...] or [[1,3,5],3,5,...]
+        channels:nucel num every layer,1 d :[3,3,5,...]
+        """
+        layer_num = len(weight_width)
+        assert layer_num + 1 == len(channels)
 
-    def max_pool(self,data,ksize=[1,3,3,1],strides=[1,2,2,1]):
-        pool = tf.nn.max_pool(data,ksize=ksize,strides=strides,padding="SAME")
+        layer_weights = []
+        layer_biases = []
+
+        def multi_nucel(wls,bls,val,ls_ord,channel_ord,power=1):
+            if val > 1:
+                wls.append([])
+                bls.append([])
+
+                half = channels[channel_ord + 1] // 2
+                wls[ls_ord].append(self.create_weight(size=[val,1,channels[channel_ord] * power,half],name='weight_a',dtype=dtype))
+                wls[ls_ord].append(self.create_weight(size=[1,val,half,channels[channel_ord + 1]],name='weight_b',dtype=dtype))
+
+                bls[ls_ord].append(self.create_bias(size=[half],dtype=dtype,name='biase_a'))
+                bls[ls_ord].append(self.create_bias(size=[channels[channel_ord + 1]],dtype=dtype,name='biase_b'))
+            else:
+                wls.append(self.create_weight([1,1,channels[channel_ord] * power,channels[channel_ord + 1]]))
+                bls.append(self.create_bias([channels[channel_ord + 1]]))
+
+        for i,v in enumerate(weight_width):
+            with tf.variable_scope('cnn_layer' + str(i)):
+                if type(v)==list or type(v)==tuple:
+                    _wt = []
+                    _bs = []
+                    multiple = 1 if i==0 else 3
+                    for j,m in enumerate(v):
+                        with tf.variable_scope('multi_nucel' + str(j)):
+                            multi_nucel(_wt,_bs,m,ls_ord=j,channel_ord=i,power=multiple)
+                        
+                    layer_weights.append(_wt)
+                    layer_biases.append(_bs)
+                else:
+                    if i==0:
+                        _mp = 1
+                    elif type(weight_width[i-1])==list or type(weight_width[i-1])==tuple:
+                        _mp = 3
+                    else:
+                        _mp = 1
+
+                    multi_nucel(layer_weights,layer_biases,v,ls_ord=i,channel_ord=i,power=_mp)
+
+        return layer_weights,layer_biases
+
+
+    def max_pool(self,data,strides=[1,2,2,1],ksize=[1,3,3,1],PADDING="SAME"):
+        pool = tf.nn.max_pool(data,ksize=ksize,strides=strides,padding=PADDING)
         return pool
 
-    def avg_pool(self,data,ksize=[1,3,3,1],stride=[1,2,2,1],PADDING='SAME'):
+    def avg_pool(self,data,stride=[1,2,2,1],ksize=[1,3,3,1],PADDING='SAME'):
         pool = tf.nn.avg_pool(data,ksize=ksize,strides=stride,padding=PADDING)
         return pool        
 
-    def run(self,data,weights,biass,ksize,shape):
-        last_res = self.multi_layer(data,weights,biass)
-        avg = self.avg_pool(last_res,ksize,stride=ksize)
-        return tf.reshape(avg,shape)
-        #return last_res
+    def cnn_layer(self,data,weights,bias,last=False,mp_stride=[1,1,1,1]):
+        # 权重个数必须与偏置个数一一对应。
+        layers = []
+        convol = data
+
+        multi1 = True if type(weights)==list or type(weights)==tuple else False
+        multi2 = False
+        _function = self._info['activate_function'] if last else None
+
+        if multi1:
+            assert len(weights)==len(bias),'number of weight unequal bias'
+            for wg,ba in zip(weights,bias):
+                multi2 = True if type(wg)==list or type(wg)==tuple else False
+                if multi2:
+                    convol = data
+                    for w,b in zip(wg,ba):
+                        convol = self.conv2d(convol,w,b,_function)
+                    layers.append(convol)
+                    convol = data
+                else:
+                    convol = self.conv2d(convol,wg,ba,_function)
+                    layers.append(convol)
+        else:
+            convol = self.conv2d(data,weights,bias,_function)
+            
+        # 每层只有一个池化操作。
+        _res = tf.concat(layers,3) if multi2 else convol
+
+        if last:
+          return _res
+        else:
+          return self.max_pool(_res,mp_stride)
+
+    # 数据，，，平均池化滤波器，结果形状，最大池化滑动步长
+    def cnn_run(self,data,weights,biase,shape,mp_stride):
+        """args:
+        data:4d;
+        weights:权重列表[[w1,w2],[w1,w2]],2d;
+        biase:偏置列表[b1,b2],1d;
+        shape:得到最终结果的形状;
+        mp_stide:最大池化，化动步长，[[1,2,2,1],[],...]，最后一层用于平均池化。
+        """
+        convol_arr = []
+        lg = len(biase)
+        i = 0
+        learn_result = data
+        is_last = False
+
+        for w,b,ms in zip(weights,biase,mp_stride):
+            if i==lg - 1:
+                is_last = True
+            else:
+                is_last = False
+            learn_result = self.cnn_layer(learn_result,w,b,is_last,ms)
+            i += 1
+        # 全局平均池化层
+        avg_res = self.avg_pool(data=learn_result,stride=mp_stride[-1],ksize=mp_stride[-1])
+        # all_connect = tf.contrib.layers.fully_connected(res_shape,15,tf.nn.sigmoid)
+        return tf.reshape(avg_res,shape)
+
+
+
 
 #普通的循环神经网络构建
 class Rnn(__Basic_net__):
     def __init__(self):
         __Basic_net__.__init__(self)
-        self.MODEL = 'Rnn'
+        self._MODEL = 'Rnn'
 
     def multi_cell(self,layers=3,cell_type='GRU'):
         multi = []
@@ -224,6 +348,7 @@ class Rnn(__Basic_net__):
 class Seq2seq(__Basic_net__):
     def __init__(self,encoder_input,decoder_input,hidden_size=3,unite=60,inference=False):
         __Basic_net__.__init__(self)
+        self._MODEL = "SEQ2SEQ"
         self.enp = encoder_input
         self.dep = decoder_input
 
@@ -313,53 +438,96 @@ class Seq2seq(__Basic_net__):
         mcell = tf.contrib.rnn.MultiRNNCell(cells)
         return mcell
 
- 
-#text-cnn模型
 
-class TextCnn(Cnn):
-    def __init__(self):
-        Cnn.__init__(self)
-        self.MODEL = "TextCnn"
 
-    def txt_layer(self,data,weights,bias,last=False,mp_stride=[1,1,1,1]):
-        #权重个数必须与偏置个数一一对应。
-        layers = []
-        for wg,ba in zip(weights,bias):
-            if type(wg)==list or type(wg)==tuple:
-                for w,b in zip(wg,ba):
-                    convol = self.conv2d(data,w,b,self._info['activate_function'])
-                pool = self.max_pool(convol,mp_stride)
-                layers.append(pool)
-            else:
-                convol = self.conv2d(data,wg,ba,self._info['activate_function'])
-                pool = self.max_pool(convol,mp_stride)
-                layers.append(pool)
-        concat = tf.concat(layers,3)
-        return concat
+# 检索式多轮对话模型   
+class DAM(__Basic_net__):
+    def __init__(self,hp):
+        """arg:
+        hp:a classa
+        """
+        __Basic_net__.__init__(self)
+        self._MODEL = "DAM"
+        self._words_id = {}
+        self._trans = transformer_model.Transformer(hp)
+        self._cnn = Cnn()
 
-#数据，权重列表[[w1,w2],[w1,w2]]，偏置列表[b1,b2]，平均池化滤波器，结果形状，最大池化滑动步长
-    def txt_run(self,data,weights,biass,ksize,shape,mp_stride):
-        convol_arr = []
-        lg = len(biass)
-        i = 0
-        leanr_result = data
-        is_last = False
+    @property
+    def token_id(self):
+        return self._words_id
+    
+    @token_id.setter
+    def token_id(self,val):
+        self._words_id = val
 
-        for w,b,ms in zip(weights,biass,mp_stride):
-            if i==lg - 1:
-                is_last = True
-            else:
-                is_last = False
-            leanr_result = self.txt_layer(leanr_result,w,b,is_last,ms)
-        #全局平均池化层
-        avg_res = self.avg_pool(leanr_result,ksize,stride=ksize)
-        #all_connect = tf.contrib.layers.fully_connected(res_shape,15,tf.nn.sigmoid)
-        return tf.reshape(avg_res,shape)
+    # 第一部分：transformer特征提取。
+    def feature(self,ids, training=True):
+        # ids:2d
+        masks = tf.equal(ids,self._words_id['<pad>'])
+        embedd = self._trans.embedding_lookup(ids)
+
+        encode_output,src_masks = self._trans.encode(embedd,masks,training)
+        return encode_output
+    
+    # 第二部分：匹配。
+    def matching(self,u_sentence,r_sentence):
+        """args:
+        u_sentence:[batch,sentence_num,seq_len,dim]
+        r_sentence:[batch,1,seq_len,dim]
+        """
+        assert len(u_sentence.get_shape())==4
+        assert len(r_sentence.get_shape())==4
+
+        cross = tf.matmul(u_sentence,r_sentence)
+        return cross
+        
+    
+    # 第三部分：聚合。
+    def aggregation(self,matches,weights,biase,ksize,shape,mp_stride):
+        # shape:[batch,sentence_num,seq_len,dim] = > [batch,seq_len,dim,sentence_num]
+        sentence_concat = tf.transpose(matches,[0,2,3,1])
+        # 多层卷积池化。
+        cnn_res = self._cnn.cnn_run(sentence_concat,weights,biase,shape,mp_stride)
+
+        return cnn_res
+        
+    # union model
+    def union_model(self,us,rs,ys,weights,biase,ksize,shape,mp_stride):
+        """args:
+        us:4d,[batch,sentence_num,seq_len];
+        rs:3d,[batch,seq_len];
+        ys:label,1d
+        """
+        batch = us.get_shape().as_list()[0]
+
+        batch_us = []
+        for i in range(batch):
+            batch_us.append(self.feature(us[i]))
+        batch_rs = self.feature(rs)
+        us = tf.concat(batch_us,0)
+
+        cross_res = self.matching(us,batch_rs)
+
+        logits = self.aggregation(cross_res,weights,biase,ksize,shape,mp_stride)
+        loss = self.calc_loss(labels=ys,logits=logits,back='mean')
+
+        accuracy = self.calc_accuracy(logits=logits,labels=ys)
+
+        rate_step = tf.Variable(0,trainable=False)
+        rate = tf.train.exponential_decay(0.05,rate_step,20000,0.1)
+        add_step = rate_step.assign_add(1)
+
+        optimize = self.optimize(loss,rate,method='ADM')
+
+        return loss,optimize,rate,add_step
+
+
+
 
 
 #该类用于和非该文件的深度学习模型结合
 class Net(__Basic_net__):
     def __init__(self):
         __Basic_net__.__init__(self)
-        self.MODEL = None
+        self._MODEL = "Basic"
 

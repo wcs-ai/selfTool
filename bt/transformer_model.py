@@ -8,7 +8,7 @@ https://www.github.com/kyubyong/transformer
 Transformer network
 '''
 import tensorflow as tf
-from selfTool.bt.t_modules import get_token_embeddings, ff, positional_encoding, multihead_attention, label_smoothing, noam_scheme
+from selfTool.bt.transformer_modules import get_token_embeddings, ff, positional_encoding, multihead_attention, label_smoothing, noam_scheme
 from tqdm import tqdm
 import logging
 from selfTool import file as fl
@@ -32,7 +32,8 @@ class Transformer:
         self.hp = hp
         self.token2idx = {}
         self.idx2token = {}
-        #self.token2idx, self.idx2token = load_vocab(hp.vocab)
+        # self.token2idx, self.idx2token = load_vocab(hp.vocab)
+        # 不是机器翻译模型时可使用cn相关。
         self.cn_embeddings = get_token_embeddings(hp.cn_vocab_size, hp.d_model, zero_pad=True)
         self.en_embeddings = get_token_embeddings(hp.en_vocab_size, hp.d_model, zero_pad=True)
 
@@ -53,30 +54,40 @@ class Transformer:
       self.idx2token = val
       
     #data是已经转为词向量的数据
-    def take_input(self,data,scope='input',training=True,use_position=False):
+    def take_input(self,data,scope='input',training=True,use_position=True):
+        #data是已经转化为词向量的数据。
         with tf.variable_scope(scope, reuse=tf.AUTO_REUSE):
             # src_masks,比较x中各元素与0比较，为0的变为True否则为False
             #src_masks = tf.equal(data, 0) # (N, T1)
-
-            # embedding
-            #enc = tf.nn.embedding_lookup(self.en_embeddings, x) # (N, T1, d_model)
-            enc = data*self.hp.d_model**0.5 # scale
+      
+            enc = data * int(self.hp.d_model ** 0.5) # scale
 
             #positional_encoding内部按照输入的数据的维度生成一个embedding矩阵，目的是加上每个词id的位置id一起作为输入
             if use_position:
               enc += positional_encoding(enc, self.hp.maxlen1)
               enc = tf.layers.dropout(enc, self.hp.dropout_rate, training=training)
-            return enc
-    #xs是已经转化为词向量的数据
+        return enc
+    
+    # 获取词嵌入向量，主要与其它模型结合时提供外部使用。
+    def embedding_lookup(self,ids,embedding=None):
+        if embedding!=None:
+          embedd_arr = embedding
+        else:
+          embedd_arr = self.cn_embeddings
+
+        embedd = tf.nn.embedding_lookup(embedd_arr,tf.to_int32(ids))
+        return embedd
+
     def encode(self, xs,src_masks, training=True):
         '''
+        xs是已经转化为词向量的数据
         Returns
         memory: encoder outputs. (N, T1, d_model)
         '''
         enc = self.take_input(xs,scope='encoder',training=training)
+
         with tf.variable_scope("encoder", reuse=tf.AUTO_REUSE):
-            
-            ## Blocks
+            # Blocks
             for i in range(self.hp.num_blocks):
                 with tf.variable_scope("num_blocks_{}".format(i), reuse=tf.AUTO_REUSE):
                     # self-attention
@@ -142,9 +153,10 @@ class Transformer:
 
         return logits, y_hat
 
-    def calc_loss(self,y,logits):
+    def calc_loss(self,y,logits,pad=None):
       #不同于0的值为True，转换为0,1矩阵。
-        nonpadding = tf.to_float(tf.not_equal(y, self.token2idx["<pad>"]))  # 0: <pad>
+        _pad = pad or self.token2idx["<pad>"]
+        nonpadding = tf.to_float(tf.not_equal(y, _pad))  # 0: <pad>
         
         y_ = label_smoothing(tf.one_hot(y, depth=self.hp.cn_vocab_size)) 
         # train scheme;label_smoothing()函数对生成的one_hot做一个平滑处理，
@@ -157,9 +169,11 @@ class Transformer:
 
         return loss
 
-    #这里的xs，ys和以前的输入格式不变
+
     def train(self, xs, ys):
-        '''
+        '''args:
+        xs:ids data 2d.
+        ys:3d.
         Returns
         loss: scalar.
         train_op: training operation
@@ -167,18 +181,19 @@ class Transformer:
         summaries: training summary node
         '''
         # forward,训练中返回的sents1无用，只是配合评估时使用，可以去除。
-        #with tf.device('/gpu:0'):
         en_masks = tf.equal(xs, 0)
-        memory,src_masks = self.encode(xs,en_masks)
-        #preds是logits最后一维最大值的位置，y等于ys用来做标签，sents2对应原句子。
-        _a,_b,y = ys
-        de_masks = tf.equal(ys, 0)
-        logits, preds = self.decode(ys, memory, src_masks,de_masks)
+        xs_enc = self.embedding_lookup(ids=xs,embedding=self.cn_embeddings)
+    
+        memory,src_masks = self.encode(xs_enc,en_masks)
+
+        y_input,y_target,y_len = ys
+        de_masks = tf.equal(y_target, 0)
+        ys_enc = self.embedding_lookup(ids=y_input,embedding=self.en_embeddings)
+        logits, preds = self.decode(ys_enc, memory, src_masks,de_masks)
 
         global_step = tf.train.get_or_create_global_step()
-        #with tf.device('/cpu:0'):
         
-        loss = self.calc_loss(y,logits)
+        loss = self.calc_loss(y_target,logits)
 
         #noam_scheme()函数内封装的是自定义的学习率衰减公式，未知
         lr = noam_scheme(self.hp.lr, global_step, self.hp.warmup_steps)
@@ -193,21 +208,23 @@ class Transformer:
         #返回损失值、梯度、步数、训练记录
         return loss, train_op, global_step, lr
 
-    def eval(self, xs, ys):
+    def eval(self, xs, ys,words_id=None):
         '''Predicts autoregressively
         At inference, input ys is ignored.
         Returns
         y_hat: (N, T2)
         '''
+        token2idx = words_id or self.token2idx
         #输入·的ys可以随意
         decoder_inputs, y, y_seqlen = ys
 
         #eval阶段decoder_inputs是未知的，只能随机生成,这里的xs[0]是encode的输入(二维)，所以ones的形状是[batch,1]
         #为每一条数据加一个开始符。
-        decoder_inputs = tf.ones((tf.shape(xs[0])[0], 1), tf.int32) * self.token2idx["<s>"]
+        decoder_inputs = tf.ones((tf.shape(xs[0])[0], 1), tf.int32) * token2idx["<s>"]
         ys = (decoder_inputs, y, y_seqlen)
 
-        memory, src_masks = self.encode(xs, False)
+        xs_enc = self.embedding_lookup(ids=xs,embedding=self.cn_embeddings)
+        memory, src_masks = self.encode(xs_enc, False)
 
         logging.info("Inference graph is being built. Please be patient.")
 
@@ -215,12 +232,11 @@ class Transformer:
         for _ in tqdm(range(self.hp.maxlen2)):
             #y_hat是一个二维的，y和sents已经无效，因为不用再参与loss的计算。
             logits, y_hat, y = self.decode(ys, memory, src_masks, False)
-            if tf.reduce_sum(y_hat, 1) == self.token2idx["<pad>"]: break
+            if tf.reduce_sum(y_hat, 1) == token2idx["<pad>"]: break
 
             _decoder_inputs = tf.concat((decoder_inputs, y_hat), 1)
             ys = (_decoder_inputs, y, y_seqlen)
 
- 
         # monitor a random sample,arg:shape,min.max,type
         
         summaries = tf.summary.merge_all()

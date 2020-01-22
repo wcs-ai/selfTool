@@ -1,6 +1,6 @@
 #train
 import tensorflow as tf
-import modeling
+import bert_modeling
 import numpy as np
 from selfTool import deep_learn as dl
 from selfTool import file,data
@@ -60,7 +60,9 @@ def train():
   output = model.get_sequence_output()
   vs = tf.contrib.framework.get_variables_to_restore()
   can_restore = [c for c in vs if c.name!='bert/embeddings/word_embeddings:0']
-  #print(list(vs))
+
+  print([i.name for i in vs])
+  return
   saver = tf.train.Saver(can_restore)
   with tf.Session() as sess:
     sess.run(tf.global_variables_initializer())

@@ -4,10 +4,8 @@ import os,queue
 
 import json,pickle
 import numpy as np
-try:
-    from selfTool import common as cm
-except:
-    cm = __import__('common')
+from selfTool import common as cm
+
 
 
 #make json or pickle

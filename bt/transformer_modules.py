@@ -174,10 +174,11 @@ def multihead_attention(queries, keys, values, key_masks,
     Returns
       A 3d tensor with shape of (N, T_q, C)  
     '''
-    d_model = queries.get_shape().as_list()[-1]
+    #d_model = queries.get_shape().as_list()[-1]
+    d_model = 144
+
     with tf.variable_scope(scope, reuse=tf.AUTO_REUSE):
         # Linear projections
-        #with tf.device('/cpu:0'):
         Q = tf.layers.dense(queries, d_model, use_bias=True) # (N, T_q, d_model)
         K = tf.layers.dense(keys, d_model, use_bias=True) # (N, T_k, d_model)
         V = tf.layers.dense(values, d_model, use_bias=True) # (N, T_k, d_model)
@@ -187,7 +188,6 @@ def multihead_attention(queries, keys, values, key_masks,
         K_ = tf.concat(tf.split(K, num_heads, axis=2), axis=0) # (h*N, T_k, d_model/h)
         V_ = tf.concat(tf.split(V, num_heads, axis=2), axis=0) # (h*N, T_k, d_model/h)
 
-        #with tf.device('/cpu:0'):
         # Attention
         outputs = scaled_dot_product_attention(Q_, K_, V_, key_masks, causality, dropout_rate, training)
 

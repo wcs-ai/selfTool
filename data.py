@@ -110,10 +110,10 @@ class Dispose(object):
         return dt
 
 
-#专用于处理nlp数据
+# 专用于处理nlp数据
 class Nlp_data(object):
     """docstring for read_file"""
-    #sequence:文件队列；typ：读取的是中文还是英文en;coording_num:线程数
+    # sequence:文件队列；typ：读取的是中文还是英文en;coording_num:线程数
     def __init__(self):
         self.vocab = {}
         self.words_to_id_res = []
@@ -138,7 +138,7 @@ class Nlp_data(object):
     def vb(self,val):
       self.vocab = val
 
-    #获取：词转id的结果
+    # 获取：词转id的结果
     @property
     def converse_res(self):
         return self.words_to_id_res
@@ -147,7 +147,7 @@ class Nlp_data(object):
     def converse_res(self,val):
         self.words_to_id_res = val      
    
-    #分词、去除停用词、返回词列表，传入一段文字
+    # 分词、去除停用词、返回词列表，传入一段文字
     def word_cut(self,text,typ='cn',file_path=r'E:\AI\selfTool/cn_stop.txt',stop=False):
       """args:
       text:一段文字；
@@ -167,24 +167,24 @@ class Nlp_data(object):
       else:
         all_words = nltk.word_tokenize(text)
     
-      #去除停用词
+      # 去除停用词
       if stop:
         all_words = common.stop_word(all_words,typ=typ,file_path=file_path)
       return all_words
 
-    #统计每个词的词频,若需要建立多个词表时需要先清空self.vocab
+    # 统计每个词的词频,若需要建立多个词表时需要先清空self.vocab
     def calc_wordsNum(self,words_list):
         for word in words_list:
             if word in self.vocab:
                 self.vocab[word] = self.vocab[word] + 1
             else:
                 self.vocab[word] =  1
-    #直接将整个数据矩阵放入来统计,words:2dim=>[sentence,words]
+    # 直接将整个数据矩阵放入来统计,words:2dim=>[sentence,words]
     def count_all(self,words):
       for w in words:
         self.calc_wordsNum(w)
     
-    #剔除小于指定词频的词
+    # 剔除小于指定词频的词
     def rid_words(self,vocab=None,min_count=10):
         words = vocab or self.vocab
         words['<pad>'] = 9999
@@ -198,7 +198,7 @@ class Nlp_data(object):
         self.vocab = rid_after
         return rid_after
 
-    #根据词频表生成词-id，id-词文件
+    # 根据词频表生成词-id，id-词文件
     def c_wid(self,vocab=None,create_path='',save=False):
         _vocab = vocab or self.vocab
         words = list(_vocab.keys())
@@ -223,7 +223,7 @@ class Nlp_data(object):
         return w_id,id_w
 
     
-    #将词转换为id,在循环中使用时让back=True，words_llist为1d,back为False时words_list为2d
+    # 将词转换为id,在循环中使用时让back=True，words_llist为1d,back为False时words_list为2d
     def word_to_id(self,words_list,vocab=None,back=True):
         vocab_dict = vocab or self.words_id
 
@@ -244,7 +244,7 @@ class Nlp_data(object):
             else:
                 return _wl(words_list)
 
-    #去除为空的数据
+    # 去除为空的数据
     def drop_empty(self,x,y):
         xd = []
         yd = []
@@ -255,7 +255,7 @@ class Nlp_data(object):
                 xd.append(a)
                 yd.append(b)
         return xd,yd
-    #查看最小最大序列长度
+    # 查看最小最大序列长度
     def seq_len(self,ids):
       ls = [len(c) for c in ids]
       return {'min':min(ls),'max':max(ls)}
@@ -272,9 +272,14 @@ def point_distance(x,y):
 
 
 #打乱数据
-def shufle_data(x,y):
+def shuffle_data(x,y):
     lg = np.arange(0,len(y))
     np.random.shuffle(lg)
+
+    if type(x)!=np.ndarray:
+      x = np.array(x)
+      y = np.array(y)
+    
     res_x = x[lg]
     res_y = y[lg]
     return (res_x,res_y)
@@ -358,6 +363,7 @@ def norm_data(data,query_shape,method='norm'):
 	#还原数据形状
 	res_data = np.reshape(take_data,shape)
 	return res_data
+
 
 #填充每条数据的序列数到指定长
 def padding(data,seq_num,pad=0):

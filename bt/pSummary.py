@@ -6,7 +6,7 @@
 """
 import numpy as np
 import tensorflow as tf
-from selfTool.bt import t_model,t_modules,b_modeling
+from selfTool.bt import transformer_model,transformer_modules,bert_modeling
 import random
 
 class BtSummary(object):
@@ -54,12 +54,12 @@ class BtSummary(object):
         embed = vocab_embed or tf.random_uniform([self._bt['vocab_size'],self._bt['max_position_embeddings']])
         self._vocab_embed = tf.Variable(embed,dtype=tf.float32,name='vocab_embedding')
 
-    #生成每个batch数据的embedding
+    # 生成每个batch数据的embedding
     def input_embedding(self,input_ids):
         input_embed = self.bModel.create_embedding(input_ids)
         return input_embed
 
-    #run bert model
+    # run bert model
     def bert(self,input_ids):
         self.bModel._vocabEmbed = self._vocab_embed
         #input_embed = self.input_embedding(input_ids)
@@ -67,7 +67,7 @@ class BtSummary(object):
         output = self.bModel.get_sequence_output()
         return output
 
-    #make transformer model
+    # make transformer model
     def transformer(self,encode_output,decode_embed,decode_ids,encode_mask,decode_mask):
       """args:
       encode_output:bert模型的输出，对应transformer模型的encoder层输出部分
@@ -79,7 +79,7 @@ class BtSummary(object):
       loss = self.tModel.calc_loss(decode_ids,logits)
       return loss,preds
 
-    #整个模型的流程
+    # 整个模型的流程
     def union_model(self,encode_ids,decode_ids):
         self.embedding()
 

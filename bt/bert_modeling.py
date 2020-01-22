@@ -141,7 +141,7 @@ class BertModel(object):
       config: `BertConfig` instance,a dict.
       is_training: bool. true for training model, false for eval model. Controls
         whether dropout will be applied.
-      input_ids: int32 Tensor of shape [batch_size, seq_length].
+
       input_mask: (optional) int32 Tensor of shape [batch_size, seq_length].
       token_type_ids: (optional) int32 Tensor of shape [batch_size, seq_length].
       use_one_hot_embeddings: (optional) bool. Whether to use one-hot word
@@ -185,8 +185,8 @@ class BertModel(object):
     #bert_embed = embed or self.embedding_output
 
     with tf.variable_scope(self._scope, default_name="bert"):
+      embed = self.create_embedding(input_ids)
       with tf.variable_scope("encoder"):
-        embed = self.create_embedding(input_ids)
         # This converts a 2D mask of shape [batch_size, seq_length] to a 3D
         # mask of shape [batch_size, seq_length, seq_length] which is used
         # for the attention scores.
@@ -199,14 +199,14 @@ class BertModel(object):
         self.all_encoder_layers = transformer_model(
             input_tensor=embed,
             attention_mask=attention_mask,
-            hidden_size=self.config['hidden_size'],
-            num_hidden_layers=self.config['num_hidden_layers'],
-            num_attention_heads=self.config['num_attention_heads'],
-            intermediate_size=self.config['intermediate_size'],
-            intermediate_act_fn=get_activation(self.config['hidden_act']),
-            hidden_dropout_prob=self.config['hidden_dropout_prob'],
-            attention_probs_dropout_prob=self.config['attention_probs_dropout_prob'],
-            initializer_range=self.config['initializer_range'],
+            hidden_size=self.config.hidden_size,
+            num_hidden_layers=self.config.num_hidden_layers,
+            num_attention_heads=self.config.num_attention_heads,
+            intermediate_size=self.config.intermediate_size,
+            intermediate_act_fn=get_activation(self.config.hidden_act),
+            hidden_dropout_prob=self.config.hidden_dropout_prob,
+            attention_probs_dropout_prob=self.config.attention_probs_dropout_prob,
+            initializer_range=self.config.initializer_range,
             do_return_all_layers=True)
 
       #do_return_alL_layers为True时返回的是所有层的运行结果，所以这里需要取最后一层结果。
@@ -222,9 +222,9 @@ class BertModel(object):
         first_token_tensor = tf.squeeze(self.sequence_output[:, 0:1, :], axis=1)
         self.pooled_output = tf.layers.dense(
             first_token_tensor,
-            self.config['hidden_size'],
+            self.config.hidden_size,
             activation=tf.tanh,
-            kernel_initializer=create_initializer(self.config['initializer_range']))
+            kernel_initializer=create_initializer(self.config.initializer_range))
 
   #与create_embedding一起生成词向量，与其它模型结合使用时建议不使用该函数。
   def create_vocab_embed(self,input):
@@ -248,27 +248,27 @@ class BertModel(object):
 
     #ids_to_embedding = tf.nn.embedding_lookup(self.vocab_embed,input_ids)
     ids_to_embedding,_table = embedding_lookup(input_ids,
-                                        vocab_size=self.config['vocab_size'],
-                                        embedding_size=self.config['hidden_size'],
-                                        initializer_range=self.config['initializer_range'])
+                                        vocab_size=self.config.vocab_size,
+                                        embedding_size=self.config.hidden_size,
+                                        initializer_range=self.config.initializer_range)
 
-    with tf.variable_scope(self._scope, default_name="bert"):
-        # Add positional embeddings and token type embeddings, then layer
-        # normalize and perform dropout.
-        #use_token_type,use_position_embeddings都为True表示使用:词向量+语句向量+位置向量
-        self.embedding_output = embedding_postprocessor(
+    with tf.variable_scope(self._scope, default_name="embeddings"):
+      # Add positional embeddings and token type embeddings, then layer
+      # normalize and perform dropout.
+      # use_token_type,use_position_embeddings都为True表示使用:词向量+语句向量+位置向量
+      self.embedding_output = embedding_postprocessor(
             input_tensor=ids_to_embedding,#self.vocab_embed
             use_token_type=True,
             token_type_ids=self.token_type_ids,
-            token_type_vocab_size=self.config['type_vocab_size'],
+            token_type_vocab_size=self.config.type_vocab_size,
             token_type_embedding_name="token_type_embeddings",
             use_position_embeddings=True,
             position_embedding_name="position_embeddings",
-            initializer_range=self.config['initializer_range'],
-            max_position_embeddings=self.config['max_position_embeddings'],
-            dropout_prob=self.config['hidden_dropout_prob'])
+            initializer_range=self.config.initializer_range,
+            max_position_embeddings=self.config.max_position_embeddings,
+            dropout_prob=self.config.hidden_dropout_prob)
         
-        return self.embedding_output
+    return self.embedding_output
      
   def get_pooled_output(self):
     return self.pooled_output

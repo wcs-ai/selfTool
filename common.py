@@ -95,10 +95,19 @@ def precision(x,y):
     val = round(ok/leg)
     return val
 
- 
+# 去除字符串中的一些换行符。。。
+def dislodge(s,alpha=None):
+  import re
+  _alpha = alpha or ['\n','\s',' ','\o','\t','\v','\f','\b','\a']
+
+  for i in _alpha:
+    s = re.sub(i,'',s)
+
+  return s
 
 
-#批量转为one_hot标签
+
+# 批量转为one_hot标签
 def one_hot(batch_label,gap=0,deep=10):
     #默认类是从0开始
     hot_res = []
@@ -107,14 +116,14 @@ def one_hot(batch_label,gap=0,deep=10):
         hot_res.append(lb)
     return hot_res
 
-#用annoy库对训练好的词向量构建快速查找
+# 用annoy库对训练好的词向量构建快速查找
 def construct_search(path):
     from gensim.models import KeyedVectors
     import json
     from collections import OrderedDict
     tc_wv_model = KeyedVectors.load_word2vec_format(path,binary=True)
     word_index = OrderedDict()
-    #counter为索引，key为词;构建一个id词汇映射表，并存为json文件
+    # counter为索引，key为词;构建一个id词汇映射表，并存为json文件
 
     """
     for counter,key in enumerate(tc_wv_model.vocab.keys()):
@@ -130,21 +139,35 @@ def construct_search(path):
 
     
     for i,key in enumerate(tc_wv_model.vocab.keys()):
-        #tc_wv_model[key]为词对应的词向量
+        # tc_wv_model[key]为词对应的词向量
         v = tc_wv_model[key]
-        #每条数据按 (索引,词) 加入
+        # 每条数据按 (索引,词) 加入
         tc_index.add_item(i,v)
    
 
-    #传入的数表示建立的树的个数，多则精度高，但所需时间长
+    # 传入的数表示建立的树的个数，多则精度高，但所需时间长
     tc_index.build(30)
     tc_index.save('data/baike_vector.ann')
 
-#计算卷积，池化中VALID情况想要的卷积核或滤波器宽度。
-def calc_nucleus_width(out_width,input_width,step,method="VALID"):
-    if method=="VALID":
-        nucleus_width = input_width - (out_width*step - 1)
-    return nucleus_width
+# 计算卷积，池化中VALID情况想要的卷积核或滤波器宽度。
+def cnn_padding(input_width,step,out_width=None,nucel_width=None,method="VALID"):
+    res_width = ''
+    # 计算输出宽度
+    if out_width==None:
+        if method=="VALID":
+            res_width = (input_width - nucel_width + 1) / step
+        else:
+            res_width = input_width / step
+        
+        res_width = math.floor(res_width)
+    else:
+    # 计算卷积核宽
+        if method=="VALID":
+            res_width = input_width - (out_width * step - 1)
+        else:
+            res_width = 0
+
+    return res_width
 
 
 
@@ -434,4 +457,41 @@ class HMM(object):
         
         if next_ < len(text):
             yield text[next_:]
+
+
+# N-Gram算法计算两字符串相似度。
+def N_Gram(st1,st2,N=2):
+    #按N长切分字符串
+    n_cut = lambda st: [st[i:i + N] for i in list(range(len(st)))[::N]]
+
+    #两字符串相似度
+    def simlar(s1,s2):
+        #列表转为集合，并将各集合内重复值个数做为交集的差集个数。
+        js1 = set(s1)
+        js2 = set(s2)
+        r_s1 = len(s1) - len(js1)
+        r_s2 = len(s2) - len(js2)
+        #交集
+        intersection = js1 & js2
+        is_score = len(intersection) * N
+        #不共同的元素。
+        differ = js1 ^ js2
+        #n-gram公式
+        score = is_score + (len(differ) + r_s1 + r_s2) * N / 2 - is_score
+        return score
+
+    st1 = n_cut(st1)
+    scores = []
+    if isinstance(st2,list):
+        for j in st2:
+            cut_st2 = n_cut(j)
+            scores.append(simlar(st1,cut_st2))
+        return scores
+    else:
+        st2 = n_cut(st2)
+        res = simlar(st1,st2)
+        return res
+        
+        
+
     
