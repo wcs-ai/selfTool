@@ -413,6 +413,7 @@ def baiki_vector(data,baiki_path,module='bin',place=0):
   #存储已查找过的词，重复的则不必再到模型中查找。
   buffer_vector = {}
   res = []
+
   for sen in data:
     sws = []
     for w in sen:
@@ -432,6 +433,30 @@ def baiki_vector(data,baiki_path,module='bin',place=0):
 
   return dt
         
+# 按照词表id顺序构建一个vector词表，用于embedding_lookup
+def embedding_vector(vocab,module='baiki',module_path=None):
+    import gensim
+    assert module_path!=None,'query module_path of vector file'
+    vocab_size = len(vocab.keys())
+    vocab_embed = [0 for c in range(vocab_size)]
+
+    if module=='baiki':
+        empty = [0 for i in range(128)]
+        #model = gensim.models.Word2Vec.load(module_path)
+        model = gensim.models.KeyedVectors.load_word2vec_format(module_path,binary=True)
+        for key in vocab:
+            if key in model.wv.index2word:
+                vocab_embed[vocab[key]] = list(model[key])
+            else:
+                vocab_embed[vocab[key]] = empty
+    else:
+        pass
+
+    return list(vocab_embed)
+
+
+
+
 
 
 #将腾讯的词向量文件分成9个json文件

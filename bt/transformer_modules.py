@@ -155,7 +155,7 @@ def mask(inputs, key_masks=None, type=None):
 
 
 def multihead_attention(queries, keys, values, key_masks,
-                        num_heads=8, 
+                        num_heads=4, 
                         dropout_rate=0,
                         training=True,
                         causality=False,
@@ -174,8 +174,7 @@ def multihead_attention(queries, keys, values, key_masks,
     Returns
       A 3d tensor with shape of (N, T_q, C)  
     '''
-    #d_model = queries.get_shape().as_list()[-1]
-    d_model = 144
+    d_model = queries.get_shape().as_list()[-1]
 
     with tf.variable_scope(scope, reuse=tf.AUTO_REUSE):
         # Linear projections

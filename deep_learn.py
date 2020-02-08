@@ -23,8 +23,11 @@ class __Basic_net__(object):
             "unites":[20,50,80,100,60,30,15],
             "beamWidth":1,
             "x":[],
-            "y":[]
+            "y":[],
+            "training":True,
+            "gpu_config":tf.ConfigProto(log_device_placement=True,allow_soft_placement=True)
         }
+        self._info['gpu_config'].gpu_options.allow_growth = True
 
     @property
     def arg(self):
@@ -37,6 +40,7 @@ class __Basic_net__(object):
     def generator_callback(self):
         for a,b in zip(self._info['x'],self._info['y']):
             yield a,b,len(a),len(b)
+            
     #使用tensorflow的data模块来导入数据
     def load_data(self,ge_fn=None,
                     opt=(tf.int32,tf.int32,tf.int32,tf.int32),
@@ -143,17 +147,16 @@ class Cnn(__Basic_net__):
     def __init__(self):
         __Basic_net__.__init__(self)
         self._MODEL = "CNN"
-        self.op = 'rnn'
-        self.ACTIVATE_FUNCTION = self.Swish
 
     #封装了归一化、激活的卷积操作,数据、卷积核、偏置值、激活函数、是否是训练状态、滑动步长
-    def conv2d(self,data,nucel,bias=0,activate_function=tf.nn.relu,training=True,strides=[1,1,1,1],PADDING='SAME'):
-        # x = tf.nn.dropout(data,0.9)
+    def conv2d(self,data,nucel,bias=0,activate_function=tf.nn.relu,strides=[1,1,1,1],PADDING='SAME'):
+
         cvd = tf.nn.conv2d(data,nucel,strides=strides,padding=PADDING)
+        
         if bias!=0:
             cvd = tf.nn.bias_add(cvd,bias)
 
-        norm_cvd = batch_norm(cvd,decay=0.9,is_training=training)
+        norm_cvd = batch_norm(cvd,decay=0.9,is_training=self._info['training'])
         # norm_cvd = cvd
         elu_cvd = norm_cvd if activate_function==None else activate_function(norm_cvd)
         return elu_cvd    
@@ -248,7 +251,7 @@ class Cnn(__Basic_net__):
 
         multi1 = True if type(weights)==list or type(weights)==tuple else False
         multi2 = False
-        _function = self._info['activate_function'] if last else None
+        _function = self._info['activate_function'] if last==False else None
 
         if multi1:
             assert len(weights)==len(bias),'number of weight unequal bias'
@@ -264,10 +267,11 @@ class Cnn(__Basic_net__):
                     convol = self.conv2d(convol,wg,ba,_function)
                     layers.append(convol)
         else:
-            convol = self.conv2d(data,weights,bias,_function)
+            convol = self.conv2d(convol,weights,bias,_function)
             
         # 每层只有一个池化操作。
-        _res = tf.concat(layers,3) if multi2 else convol
+        _res = tf.concat(layers,axis=-1) if multi2 else convol
+        print(_res)
 
         if last:
           return _res
@@ -281,12 +285,13 @@ class Cnn(__Basic_net__):
         weights:权重列表[[w1,w2],[w1,w2]],2d;
         biase:偏置列表[b1,b2],1d;
         shape:得到最终结果的形状;
-        mp_stide:最大池化，化动步长，[[1,2,2,1],[],...]，最后一层用于平均池化。
+        mp_stride:最大池化，化动步长，[[1,2,2,1],[],...]，最后一层用于平均池化。
         """
         convol_arr = []
         lg = len(biase)
         i = 0
-        learn_result = data
+        keep_prob = 0.9 if self._info['training'] else 1
+        learn_result = tf.nn.dropout(data,keep_prob)
         is_last = False
 
         for w,b,ms in zip(weights,biase,mp_stride):
