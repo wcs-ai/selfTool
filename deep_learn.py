@@ -25,9 +25,11 @@ class __Basic_net__(object):
             "x":[],
             "y":[],
             "training":True,
+            "clip":10,
             "gpu_config":tf.ConfigProto(log_device_placement=True,allow_soft_placement=True)
         }
         self._info['gpu_config'].gpu_options.allow_growth = True
+        self._info['gpu_config'].gpu_options.per_process_gpu_memory_fraction = 0.9
 
     @property
     def arg(self):
@@ -66,7 +68,7 @@ class __Basic_net__(object):
         return x*tf.nn.sigmoid(x*beta)
 
     #创建，随机生成参数
-    def create_weight(self,size,dtype=None,name="weight"):
+    def create_weight(self,size,dtype=None,name='weight'):
         dp = dtype or self._UNIFY_FLOAT
         with tf.device('/cpu:0'):
             res = tf.truncated_normal(size,stddev=0.2,mean=1,dtype=dp)
@@ -98,15 +100,30 @@ class __Basic_net__(object):
         else:
             return (False,0)
     # 优化器
-    def optimize(self,loss,learn_rate=0.1,method="ADM"):
-        if method=="ADM":
-            _optimize = tf.train.AdamOptimizer
-        return _optimize(learn_rate).minimize(loss)
+    def optimize(self,loss,learn_rate=0.1,method="ADAM"):
+        if method=="ADAM":
+            _optimize = tf.train.AdamOptimizer(learn_rate)
+        elif method=='SGD':
+            _optimize = tf.train.GradientDescentOptimizer(learn_rate)
+        elif method=='ADGRAD':
+            _optimize = tf.train.AdagradDAOptimizer(learn_rate)
+        else:
+            raise KeyError
+            
+        _grad_value = _optimize.compute_gradients(loss)
+        if self._info['clip']:
+            _grad_value = [[tf.clip_by_value(g,-self._info['clip'],self._info['clip']),v] for g,v in _grad_value]
+        _back_upgrade = _optimize.apply_gradients(_grad_value)
+
+        return _back_upgrade
+
 
     #计算损失值
-    def calc_loss(self,labels,logits,back="sum",method="softmax"):
+    def calc_loss(self,labels,logits,back="sum",method="softmax",weight=True):
         loss = ''
-        if method=="softmax":
+        if weight==True:
+            loss = tf.nn.weighted_cross_entropy_with_logits(targets=labels,logits=logits,pos_weight=0.9)
+        elif method=="softmax":
             loss = tf.nn.softmax_cross_entropy_with_logits(labels=labels,logits=logits)
         elif method=="sparse":
             loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=labels,logits=logits)
@@ -129,8 +146,25 @@ class __Basic_net__(object):
         # 返回一个合适的衰退学习率步数。
         _a = (num * val) // batch
         return _a * epoch
-
     
+    def mask(self,vector,keymask):
+        """对序列转化后的向量做掩模——惩罚<pad>部分。
+        args:
+        vector:[batch,seq_len,dim];
+        keymask:bool,[batch,seq_len]
+        """
+        _last_shape = vector.get_shape().as_list()[-1]
+
+        keymask = tf.to_float(keymask)
+        padding_num = -2 ** 32 + 1
+        keymask = tf.tile(keymask, [tf.shape(vector)[0] // tf.shape(keymask)[0], 1])
+        keymask = tf.expand_dims(keymask,-1)
+        #padding_list = [padding_num for i in range(_last_shape)]
+
+        #return tf.add(vector,tf.multiply(keymask,padding_list))
+        return vector + keymask * padding_num
+
+
 
 #用于测试时建立的session
 def test_session(data,init=False):
@@ -156,9 +190,9 @@ class Cnn(__Basic_net__):
         if bias!=0:
             cvd = tf.nn.bias_add(cvd,bias)
 
-        norm_cvd = batch_norm(cvd,decay=0.9,is_training=self._info['training'])
-        # norm_cvd = cvd
-        elu_cvd = norm_cvd if activate_function==None else activate_function(norm_cvd)
+        cvd = batch_norm(cvd,decay=0.9,is_training=self._info['training'])
+        # cvd = cvd
+        elu_cvd = cvd if activate_function==None else activate_function(cvd)
         return elu_cvd    
 
 
@@ -210,6 +244,8 @@ class Cnn(__Basic_net__):
             else:
                 wls.append(self.create_weight([1,1,channels[channel_ord] * power,channels[channel_ord + 1]]))
                 bls.append(self.create_bias([channels[channel_ord + 1]]))
+
+
 
         for i,v in enumerate(weight_width):
             with tf.variable_scope('cnn_layer' + str(i)):
@@ -271,7 +307,6 @@ class Cnn(__Basic_net__):
             
         # 每层只有一个池化操作。
         _res = tf.concat(layers,axis=-1) if multi2 else convol
-        print(_res)
 
         if last:
           return _res
@@ -287,6 +322,7 @@ class Cnn(__Basic_net__):
         shape:得到最终结果的形状;
         mp_stride:最大池化，化动步长，[[1,2,2,1],[],...]，最后一层用于平均池化。
         """
+
         convol_arr = []
         lg = len(biase)
         i = 0
@@ -305,6 +341,7 @@ class Cnn(__Basic_net__):
         avg_res = self.avg_pool(data=learn_result,stride=mp_stride[-1],ksize=mp_stride[-1])
         # all_connect = tf.contrib.layers.fully_connected(res_shape,15,tf.nn.sigmoid)
         return tf.reshape(avg_res,shape)
+
 
 
 
@@ -514,7 +551,7 @@ class DAM(__Basic_net__):
         cross_res = self.matching(us,batch_rs)
 
         logits = self.aggregation(cross_res,weights,biase,ksize,shape,mp_stride)
-        loss = self.calc_loss(labels=ys,logits=logits,back='mean')
+        loss = self.calc_loss(labels=ys,logits=logits,back='mean',weight=False)
 
         accuracy = self.calc_accuracy(logits=logits,labels=ys)
 

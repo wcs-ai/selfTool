@@ -7,8 +7,8 @@
 import numpy as np
 import pandas as pd
 from sklearn import preprocessing
-import json
-import math
+import json,random
+import math,re
 import copy,tqdm
 import jieba
 import nltk
@@ -22,6 +22,8 @@ class Dispose(object):
         self.dim = 2
         self.miss_val = [None]
         self.place = 0
+    
+    # 设置miss值。
     @property
     def miss(self):
         return self.miss_val
@@ -54,30 +56,55 @@ class Dispose(object):
                     miss_index_arr.append(v1)
         return miss_index_arr
 
-    def _mean(self,data,idx,window=3):
-        #统一传来的数据都是一维的
+    def _window_data(self,data,idx,window):
+        """求出idx附近可用的值
+        args:
+        data:1d;
+        idx:select index;
+        window:idx left。idx right。
+        """
         val = []
         val.extend(data[idx - window:idx])
         val.extend(data[idx + 1:idx + window])
+
+        # 选到的值及索引。
         save = []
-        for i in val:
+        idxs = []
+
+        for i,v in enumerate(val):
             try:
-                ni = list(i)
+                ni = list(v)
             except:
-                ni = i
+                ni = v
             if ni in self.miss_val:
                 continue
             else:
                 save.append(ni)
-        if len(save)==0:
+                idxs.append(i)
+        return save,idxs
+
+    def _mean(self,data):
+        """用来计算指定数据的均值。
+        
+        """
+        
+        if len(data)==0:
             res = self.place
         else:
-            res = np.mean(save, axis=0)
+            res = np.mean(data, axis=0)
         return res
 
-    #对给定缺失值类型进行插值，arguments:插值时依据的数据维度、插值方法、没有好的插值方案时使用的占位值
-    def interpolate(self,data,axis=1,method="mean",place=None):
-      #data:2dim
+    
+    def interpolate(self,data,axis=1,method="mean",place=0):
+        """对给定缺失值类型进行插值.
+        args:
+        data:2d.
+        axis:插值方法选择的指定维度数据作为插值参考。0为选择行。
+        method:插值方法.
+        place:没有好的插值方案时使用的占位值.
+        """
+        from scipy.interpolate import lagrange
+
         self.place = place
         if type(data)==list or type(data)==tuple:
             dt = np.array(data)
@@ -85,29 +112,67 @@ class Dispose(object):
             dt = np.array(data.values)
         else:
             dt = data
-
+        # 查询数据中的缺失值位置。
+        dim = 2 if len(dt.shape)>1 else 1
         miss_idx = self.search_miss(dt)
+        
         for val in miss_idx:
-            if self.dim==1:
+            if dim==1:
                 send_dt = dt
                 pt = val
             else:
+                # 判断维度选择参考数据。
                 if axis==0:
                     send_dt = dt[val[0]]
                     pt = val[1]
                 else:
                     send_dt = dt[:,val[1]]
                     pt = val[0]
-            #判断插值方法,mean:使用缺失值附件的数据的均值代替
+            
+            _apply_data,idxs = self._window_data(send_dt,pt)
+            #判断插值方法,mean:使用缺失值附近的数据的均值代替
             if method=='mean':
-                res = self._mean(send_dt,pt)
+                res = self._mean(_apply_data)
+            elif method=='lagrange':
+                res = lagrange(idxs,_apply_data)(pt)
 
             #将结果插入数据中
-            if self.dim==1:
+            if dim==1:
                 dt[val] = res
             else:
                 dt[val[0]][val[1]] = res
         return dt
+    
+    #数据规范化
+    def norm_data(self,data,query_shape,method='norm'):
+        shape = np.shape(data)
+        take_data = []
+        dt = np.reshape(data,query_shape)
+
+        if method=='norm':
+            scaler = preprocessing.normalize
+        elif method=='max-min':
+            scaler = preprocessing.MinMaxScaler()
+        elif method=='qt':
+            scaler = preprocessing.QuantileTransformer()
+        elif method=='mas':
+            scaler = preprocessing.MaxAbsScaler()
+
+        #可批量归一化数据
+        if len(shape)>2:
+            for d in dt:
+                if method=='norm':
+                    take_data.append(scaler(d,norm='l2'))
+                else:
+                    take_data.append(scaler.fit_transform(d))
+        else:
+            if method=='norm':
+                take_data = scaler(d,norm='l2')
+            else:
+                take_data = scaler.fit_transform(d)
+        #还原数据形状
+        res_data = np.reshape(take_data,shape)
+        return res_data
 
 
 # 专用于处理nlp数据
@@ -177,6 +242,8 @@ class Nlp_data(object):
         for word in words_list:
             if word in self.vocab:
                 self.vocab[word] = self.vocab[word] + 1
+            elif re.search('\d',word):
+                continue
             else:
                 self.vocab[word] =  1
     # 直接将整个数据矩阵放入来统计,words:2dim=>[sentence,words]
@@ -335,55 +402,25 @@ def rnn_batch(data,batch=1):
         j = j + batch
         yield batch_res
 
-#数据规范化
-def norm_data(data,query_shape,method='norm'):
-	shape = np.shape(data)
-	take_data = []
-	dt = np.reshape(data,query_shape)
-
-	if method=='norm':
-		scaler = preprocessing.normalize
-	elif method=='max-min':
-		scaler = preprocessing.MinMaxScaler()
-	elif method=='qt':
-		scaler = preprocessing.QuantileTransformer()
-
-	#可批量归一化数据
-	if len(shape)>2:
-		for d in dt:
-			if method=='norm':
-				take_data.append(scaler(d,norm='l2'))
-			else:
-				take_data.append(scaler.fit_transform(d))
-	else:
-		if method=='norm':
-			take_data = scaler(d,norm='l2')
-		else:
-			take_data = scaler.fit_transform(d)
-	#还原数据形状
-	res_data = np.reshape(take_data,shape)
-	return res_data
-
-
 #填充每条数据的序列数到指定长
 def padding(data,seq_num,pad=0):
-    datas = copy.deepcopy(list(data))
+    """
+    data:>=2d
+    """
     dt = []
 
-    for i,ct in enumerate(datas):
+    for i,ct in enumerate(data):
         q = seq_num - len(ct)
+        if q >= 0:
+            v = [j for j in ct]
+            for t in range(q):
+                v.append(pad)
+            dt.append(v)
+        else:
+            # 若超出指定长度则截断。
+            dt.append(ct[0:seq_num])
 
-        assert q>=0,'len(ct):{},that is lenly then seq_num:{}'.format(len(ct),seq_num)
-        for c in range(q):
-            if type(datas)==np.ndarray:
-                np.append(datas[i],pad)
-            else:
-                datas[i].append(pad)
-            
-            #np.append(datas[i],emp)
-        dt.append(datas[i])
     return dt
-
 
 
 """
@@ -432,7 +469,9 @@ def baiki_vector(data,baiki_path,module='bin',place=0):
   dt = take.interpolate(res,axis=0,method='mean',place=place)
 
   return dt
-        
+
+
+
 # 按照词表id顺序构建一个vector词表，用于embedding_lookup
 def embedding_vector(vocab,module='baiki',module_path=None):
     import gensim
@@ -518,17 +557,18 @@ def divide_tencent_vector(tencent_path):
         json.dump(tencent[idx],last)
 
 
-#利用9个腾讯词向量json文件将汉字转为词向量,不占用内存的使用方法(内存低于16g时使用)
-def tencent_vector(data_in,tencent_path):
-    #按照原数据结构，构建一个维数完全相同的数组，即使原数据未对齐
-    zero_index = []
-    for u,val in enumerate(data_in): 
-        zero_index.append([])
-        for t in val:
-            zero_index[u].append(0)
 
-    #save data that tencent's vector
-    words_obj = {}
+
+def tencent_vector(vocab,tencent_path,save_path='',save=True):
+    """根据vocab查找腾讯词向量存为数组，转为embedding_look_up()使用的词向量矩阵。
+    args:
+    vocab:dict json file;
+    tencent_path:腾讯词向量存放的文件夹；
+    save_path:保存的文件夹；
+    save:是否保存。
+    """
+    VECTOR_SIZE = 200
+
     tencent_file = {
         "t1":1,
         "t2":2,
@@ -541,52 +581,51 @@ def tencent_vector(data_in,tencent_path):
         "t9":3,
     }
 
+    _embedd = [0 for i in range(len(vocab.keys()))]
+    _pad = [0 for j in range(VECTOR_SIZE)]
+    _unk = [random.uniform(-6,0) for i in range(VECTOR_SIZE)]
+
+    # 读取tencent词向量文件。
     def read_tencent(ord):
-        path = tencent_path+'tc'+ str(ord) +'.json'
+        path = tencent_path+'/tc'+ str(ord) +'.json'
         with open(path,'r') as f:
             data = json.load(f)
         return data
-    #将所有要查找的词都放到words_obj中去
-    for a,item in enumerate(data_in):
-        for b,word in enumerate(item):
-            if word not in words_obj:
-                words_obj[word] = []
 
-            words_obj[word].append([a,b])
+    _embedd[vocab['<pad>']] = _pad
+    _embedd[vocab['<unk>']] = _pad
+    for v in ['<s>','</s>','<mask>']:
+        _embedd[vocab[v]] = [random.uniform(-10,-1) for c in range(VECTOR_SIZE)]
+
+
+    del vocab['<s>'],vocab['</s>'],vocab['<pad>'],vocab['<unk>'],vocab['<mask>']
 
     #逐个打开腾讯文件
     for f in range(1,10):
         key = 't' + str(f)
-         
-        if len(words_obj.keys())==0:
-            break
+
         tencent_file[key] = read_tencent(f)
         mated_words = []
-        for w in words_obj:
+
+        for w in vocab:
             if w in tencent_file[key]:
-                #找到的词添加到mated_words中循环完一个文件后删除words_obj中对应的键值。
                 mated_words.append(w)
-                for m in words_obj[w]:
-                    zero_index[m[0]][m[1]] = tencent_file[key][w]
+                _embedd[vocab[w]] = tencent_file[key][w]
             else:
                 continue
+        # 删除已经查找到的词。        
+        for w2 in mated_words:
+            del vocab[w2]
         #销毁文件解除内存占用
         del tencent_file[key]
-        for dw in mated_words:
-            del words_obj[dw]
+    
+    # 所有未查找到的用unk填充。
+    for c in vocab:
+        _embedd[vocab[c]] = _unk
 
-    #未能找到的词
-    empty_vector = [0 for em in range(200)]
-    #print('empety words:%d'%len(words_obj.keys()))
+    if save:
+        file.op_file(file_path=save_path + '/embedding.pkl',data=_embedd,model='pkl',method='save')
+    else:
+        return _embedd
 
-    #均值代替未找到的词
-    take = Dispose()
-    take.miss = [empty_vector]
-    dt = take.interpolate(zero_index,axis=0,method='mean',place=empty_vector) 
-    """未找到的词用0代替
-    for et in words_obj:
-        for c in words_obj[et]:
-            zero_index[c[0]][c[1]] = empty_vector
-    """
-    return dt
 

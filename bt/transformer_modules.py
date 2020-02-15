@@ -106,7 +106,7 @@ def scaled_dot_product_attention(Q, K, V, key_masks,
 def mask(inputs, key_masks=None, type=None):
     """Masks paddings on keys or queries to inputs
     inputs: 3d tensor. (h*N, T_q, T_k)
-    key_masks: 3d tensor. (N, 1, T_k)
+    key_masks: 3d tensor. (N, 1, T_k);输入的id序列上做的mask(为0的地方显示为True)
     type: string. "key" | "future"
 
     e.g.,
@@ -128,7 +128,9 @@ def mask(inputs, key_masks=None, type=None):
     """
     padding_num = -2 ** 32 + 1
     if type in ("k", "key", "keys"):
+        # 布尔矩阵转为浮点数。
         key_masks = tf.to_float(key_masks)
+        # 指定维度复制key_masks
         key_masks = tf.tile(key_masks, [tf.shape(inputs)[0] // tf.shape(key_masks)[0], 1]) # (h*N, seqlen)
         key_masks = tf.expand_dims(key_masks, 1)  # (h*N, 1, seqlen)
         outputs = inputs + key_masks * padding_num
