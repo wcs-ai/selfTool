@@ -17,7 +17,7 @@ class BtSummary(object):
         self._bt = bert_config
         self._tr = tr_config
 
-        self.bert_config = b_modeling.BertConfig(
+        self.bert_config = bert_modeling.BertConfig(
           vocab_size=bert_config['vocab_size'],#36200
           hidden_size=bert_config['hidden_size'],#输出的最后一维长度,需要是num_hidden_layers的倍数
           num_hidden_layers=bert_config['num_hidden_layers'],
@@ -30,7 +30,7 @@ class BtSummary(object):
           type_vocab_size=bert_config['type_vocab_size'], #生成语句向量时中间使用的过渡数据的维度
           initializer_range=bert_config['initializer_range'])
 
-        self.bModel = b_modeling.BertModel(
+        self.bModel = bert_modeling.BertModel(
           config=self._bt,
           is_training=True,
           input_mask=None,

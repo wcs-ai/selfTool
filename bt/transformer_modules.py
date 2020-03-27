@@ -10,6 +10,7 @@ Building blocks for Transformer
 
 import numpy as np
 import tensorflow as tf
+from tensorflow.contrib.layers.python.layers import batch_norm
 
 def ln(inputs, epsilon = 1e-8, scope="ln"):
     '''Applies layer normalization. See https://arxiv.org/abs/1607.06450.
@@ -145,7 +146,8 @@ def mask(inputs, key_masks=None, type=None):
     elif type in ("f", "future", "right"):
         diag_vals = tf.ones_like(inputs[0, :, :])  # (T_q, T_k)
         #转化为下三角矩阵
-        tril = tf.contrib.linalg.LinearOperatorTriL(diag_vals).to_dense()  # (T_q, T_k)
+        tril = tf.linalg.LinearOperatorLowerTriangular(diag_vals).to_dense()  # (T_q, T_k) 高版本。
+        #tril = tf.contrib.linalg.LinearOperatorTriL(diag_vals).to_dense()  # (T_q, T_k) 底版本。
         future_masks = tf.tile(tf.expand_dims(tril, 0), [tf.shape(inputs)[0], 1, 1])  # (N, T_q, T_k)
 
         paddings = tf.ones_like(future_masks) * padding_num
@@ -203,7 +205,7 @@ def multihead_attention(queries, keys, values, key_masks,
  
     return outputs
 
-def ff(inputs, num_units, scope="positionwise_feedforward"):
+def ff(inputs, num_units, scope="positionwise_feedforward",training=True):
     '''position-wise feed forward net. See 3.3
     
     inputs: A 3d tensor with shape of [N, T, C].
@@ -226,7 +228,9 @@ def ff(inputs, num_units, scope="positionwise_feedforward"):
         # Normalize
         outputs = ln(outputs)
     
-    return outputs
+    #return outputs
+    # 修改每个block结尾添加批量归一化和激活函数。
+    return batch_norm(outputs,decay=0.8,is_training=training,activation_fn=tf.nn.softmax)
 
 def label_smoothing(inputs, epsilon=0.1):
     '''Applies label smoothing. See 5.4 and https://arxiv.org/abs/1512.00567.

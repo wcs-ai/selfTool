@@ -8,7 +8,6 @@ import numpy as np
 from selfTool.bt import transformer_model
 
 
-
 class __Basic_net__(object):
     _UNIFY_FLOAT = tf.float32
     def __init__(self):
@@ -26,7 +25,7 @@ class __Basic_net__(object):
             "y":[],
             "training":True,
             "clip":10,
-            "gpu_config":tf.ConfigProto(log_device_placement=True,allow_soft_placement=True)
+            "gpu_config":tf.ConfigProto(log_device_placement=False,allow_soft_placement=False)
         }
         self._info['gpu_config'].gpu_options.allow_growth = True
         self._info['gpu_config'].gpu_options.per_process_gpu_memory_fraction = 0.9
@@ -71,7 +70,7 @@ class __Basic_net__(object):
     def create_weight(self,size,dtype=None,name='weight'):
         dp = dtype or self._UNIFY_FLOAT
         with tf.device('/cpu:0'):
-            res = tf.truncated_normal(size,stddev=0.2,mean=1,dtype=dp)
+            res = tf.truncated_normal(size,stddev=1.0,mean=0.5,dtype=dp)
             variable = tf.get_variable(name=name,initializer=res)
 
         return variable
@@ -79,10 +78,18 @@ class __Basic_net__(object):
     def create_bias(self,size,dtype=None,name="bias"):
         dp = dtype or self._UNIFY_FLOAT
         with tf.device('/cpu:0'):
-            bias = tf.constant(0.1,shape=size,dtype=dp,name=name)
+            bias = tf.random_normal(shape=size,mean=0.1,stddev=0.2,dtype=dp,name=name)
             variable = tf.get_variable(name=name,initializer=bias)
 
         return variable
+    
+    # dl层实现
+    def Dl(self,data,weight,biase,act_fn=None):
+        act = act_fn or self._info['activate_function']
+        _d = tf.matmul(data,weight) + biase
+        _out = act(batch_norm(_d))
+
+        return _out
 
     #全连接层,一般用于最后一层，默认不使用激活函数
     def fully_connect(self,data,dim,fun=None):
@@ -137,8 +144,8 @@ class __Basic_net__(object):
 
     # 计算精确度
     def calc_accuracy(self,logits,labels):
-        logit_max = tf.argmax(logits,1)
-        label_max = tf.argmax(labels,1)
+        logit_max = tf.argmax(logits,-1)
+        label_max = tf.argmax(labels,-1)
         eq = tf.cast(tf.equal(logit_max,label_max),tf.float32)
         return tf.reduce_mean(eq)
     
@@ -326,7 +333,7 @@ class Cnn(__Basic_net__):
         convol_arr = []
         lg = len(biase)
         i = 0
-        keep_prob = 0.9 if self._info['training'] else 1
+        keep_prob = 0.7 if self._info['training'] else 1
         learn_result = tf.nn.dropout(data,keep_prob)
         is_last = False
 
@@ -341,7 +348,6 @@ class Cnn(__Basic_net__):
         avg_res = self.avg_pool(data=learn_result,stride=mp_stride[-1],ksize=mp_stride[-1])
         # all_connect = tf.contrib.layers.fully_connected(res_shape,15,tf.nn.sigmoid)
         return tf.reshape(avg_res,shape)
-
 
 
 
@@ -414,17 +420,19 @@ class Seq2seq(__Basic_net__):
         #project_layer = tf.layers.Dense(units=200,kernel_initializer=tf.truncated_normal_initializer(mean=0.0, stddev=0.1))
         project_layer = Dense(self.arg['sequence_length'])
         if not self.INFERENCE:
-            #seq_len = tf.placeholder(tf.int32, shape=[None], name='batch_seq_length')
-            #sequence_length:当前batch中每条数据的序列数量，超出的话会报错：Tried to read from index 20 but array size is: 20
             helper = TrainingHelper(self.dep,seq_length,time_major=False)
         else:
             helper = GreedyEmbeddingHelper(self.dep,start_token,end_token)
 
-        if model=="decoder":
-            train_deocde = BasicDecoder(cell=self.decode_cell,helper=helper,output_layer=project_layer,initial_state=self.encode_state)
-        else:
-            #生成一个二维的状态数据:[batch_size,num_unit]
 
+        if model=="decoder":
+            train_deocde = BasicDecoder(cell=self.decode_cell,
+                                        helper=helper,
+                                        output_layer=project_layer,
+                                        initial_state=self.encode_state)
+        else:
+            # 生成一个二维的状态数据:[batch_size,num_unit]
+            # 使用beamsearch 方法的decoder。
             if self._info['beamWidth']>1:
                 memory = tile_batch(self.encode_state, multiplier=self._info['beamWidth'])
                 #print(memory) [4,?,100]，这里的batch_size用beamWidth*batch,以后多批预测时更改。

@@ -343,6 +343,7 @@ def antistop(words_list,keyword_num=10,algorithm='TFIDF'):
         for gh in words_list:
             all_list += gh
         res = topic_model.get_simword(all_list)
+        res = res[0:keyword_num]
     elif algorithm=='TEXTRANK':
         #调用textrank算法时直接传入文本数据
         textrank = analyse.textrank
@@ -353,6 +354,7 @@ def antistop(words_list,keyword_num=10,algorithm='TFIDF'):
         for gh in words_list:
             all_list += gh 
         res = topic_model.get_simword(all_list)
+        res = res[0:keyword_num]
     return res    
 
 

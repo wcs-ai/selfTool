@@ -37,26 +37,6 @@ class Transformer:
         self.cn_embeddings = get_token_embeddings(hp.cn_vocab_size, hp.d_model, zero_pad=True)
         self.en_embeddings = get_token_embeddings(hp.en_vocab_size, hp.d_model, zero_pad=True)
 
-        # pointer generator network网络部分。
-        if hp.pointer_network:
-          _vocab_size = hp.cn_vocab_size
-          self.hp.cn_vocab_size = hp.d_model
-          with tf.variable_scope('decoder'):
-            self.w_h = tf.get_variable(name='w_h',shape=[hp.maxlen2,self.hp.cn_vocab_size],initializer=tf.constant_initializer(0.5))
-            self.w_s = tf.get_variable(name='w_s',shape=[hp.maxlen2,self.hp.cn_vocab_size],initializer=tf.constant_initializer(0.5))
-            self.v = tf.get_variable(name='v',shape=[self.hp.cn_vocab_size],initializer=tf.constant_initializer(0.5))
-            self.w_x = tf.get_variable(name='w_x',shape=[hp.maxlen2,self.hp.cn_vocab_size],initializer=tf.constant_initializer(0.5))
-            self.w_v = tf.get_variable(name='w_v',shape=[self.hp.cn_vocab_size,_vocab_size],initializer=tf.constant_initializer(0.5))
-            self.w_c = tf.get_variable(name='w_c',shape=[hp.maxlen2,self.hp.cn_vocab_size],initializer=tf.constant_initializer(0.5))
-
-            self.v1 = tf.get_variable(name='va',shape=[hp.maxlen2,self.hp.cn_vocab_size],initializer=tf.constant_initializer(0.5))
-            self.b1 = tf.get_variable(name='b1',shape=[self.hp.cn_vocab_size],initializer=tf.constant_initializer(0.5))
-            self.b2 = tf.get_variable(name='b2',shape=[_vocab_size],initializer=tf.constant_initializer(0.5))
-            self.v2 = tf.get_variable(name='vb',shape=[hp.d_model,_vocab_size],initializer=tf.constant_initializer(0.5))
-
-            self._c = 0
-            self._R = 0.5
-
     @property
     def words_id(self):
       return self.token2idx
@@ -192,37 +172,6 @@ class Transformer:
 
         return loss
 
-    def pointer_network(self,encode_out,decode_out,ys):
-        # [batch,seq_len,dim]
-        e_t = tf.nn.tanh(encode_out * self.w_h + (decode_out * self.w_s) + (self._c * self.w_c))
-        a_t = tf.nn.softmax(self.v * e_t)
-        # [batch,1,dim]
-        h_t = tf.expand_dims(tf.reduce_sum(a_t * encode_out,axis=1),axis=1)
-        # [batch,seq_len,dim]
-        h_union_s = decode_out + h_t
-
-        # [batch,seq_len,dim]
-        p_vocab = h_union_s * self.v1 + self.b1
-        # 将长度转为词表长度。[batch,seq_len,vocab_size]
-        p_vocab = tf.nn.softmax(tf.einsum('ntd,dk->ntk', p_vocab, self.v2) + self.b2)
-
-        # [batch,seq_len,dim]
-        p_gen = h_t * self.w_h + decode_out * self.w_s + ys * self.w_x
-        # [batch,seq_len,vocab_size]
-        p_gen = tf.nn.sigmoid(tf.einsum('ntd,dk->ntk',p_gen,self.w_v))
-
-        p_w = p_gen * p_vocab + (1 - p_gen) * tf.reduce_sum(a_t)
-
-        self._c = tf.reduce_sum(a_t,axis=1)
-        _sc = tf.reduce_sum(self._c)
-        _sat = tf.reduce_sum(a_t)
-        arr = [_sc,_sat]
-
-        cs = tf.cast([tf.less(_sc,_sat),tf.less(_sat,_sc)],dtype=tf.float32)
-        covloss = tf.reduce_sum(arr * cs)
-
-        return p_w,covloss
-
     def train(self, xs, ys,step):
         '''args:
         xs:ids data 2d.
@@ -244,13 +193,8 @@ class Transformer:
         ys_enc = self.embedding_lookup(ids=y_input,embedding=self.cn_embeddings)
         logits, preds = self.decode(ys_enc, memory, src_masks,de_masks)
 
-        # pointnetwork部分
-        if self.hp.pointer_network:
-            pw,loss1 = self.pointer_network(memory,logits,ys_enc)
-            loss2 = self.calc_loss(y_target,pw)
-            total_loss = loss2 + self._R * loss1
-        else:
-            total_loss = self.calc_loss(y_target,logits)
+        
+        total_loss = self.calc_loss(y_target,logits)
 
         global_step = tf.train.get_or_create_global_step()
 

@@ -103,7 +103,7 @@ def replace_file(fp='E:\AI\selfTool',tp='E:\AI\selfTool',dt=30):
             else:
                 continue
 
-#replace_file(fp=r'E:\AI\selfTool',tp=r'D:\develope\Anaconda\envs\wcs\Lib\site-packages\selfTool')
+#replace_file(fp=r'/home/wcs/ITEM/selfTool',tp=r'/home/wcs/software/Anaconda/envs/wcs/lib/site-packages/selfTool')
 
 
 

@@ -1,3 +1,7 @@
 {
-  "python.pythonPath": "D:\\develope\\Anaconda\\envs\\wcs\\python.exe"
+  "python.pythonPath": "/home/wcs/software/Anaconda/bin/python3.6",
+  "editor.fontSize": 16,
+  "python.linting.pylintEnabled": false,
+  "python.linting.banditEnabled": true,
+  "python.linting.enabled": true
 }

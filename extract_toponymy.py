@@ -1,39 +1,71 @@
-#!/usr/bin/python
-#-*-coding:UTF-8-*-
-#extract toponymy of article
+import numpy as np
+from openpyxl import load_workbook
+import csv
+import rdflib
 
-#B:实体首部，M：实体内部，S：单独构成实体，E：实体尾部，O：不是实体部分
-symbol = ['，','、','；','：','？','——']
+xml = open('resource/knowledge.xml','a')
 
-def toponymy(datas,save_path):
-    arr = []
-    word = []
-    file = open(save_path, 'a')
-    for i in datas:
-        if i[0] in symbol:
-            continue
-        elif i[0]=='。':
-            arr.append(word)
-            file.write('\n')
-            word = []
-        elif i[1]=='ns':
-            #是地名
-            w_len = len(i[0])
-            if w_len==0:
-                file.write(i[0]+' '+i[1]+' S\n')
-                word.append((i[0],i[1],'S'))
-            else:
-                mark = ['B']+['M']*(w_len-2)+['E']
-                for j in range(w_len):
-                    file.write(i[0][j]+' '+i[1]+' '+mark[j]+'\n')
-                    word.append((i[0][j],i[1],mark[j]))
-        else:
-            a_len = len(i[0])
-            tag = ['O']*a_len
-            for g in range(a_len):
-                word.append((i[0][g],i[1],tag[g]))
-                file.write(i[0][g] + ' ' + i[1] + ' ' + tag[g]+'\n')
+with open('/home/wcs/data/kg_data/ownthink_v2.csv','r') as f:
+    reader = csv.reader(f)
 
-    file.close()
+    i = 0
+    xml.write('<?xml version="1.0"?>\n')
+    xml.write('<RDF>\n')
+    title_list = {}
+
+    try:
+        for rw in reader:
+            if rw=='\x00':
+                continue
+
+            if rw[0] not in title_list.keys():
+                title_list[rw[0]] = []
+
+            title_list[rw[0]].append(rw[1:])
+
+            if i > 15:
+                break
+            i += 1
+    except:
+        print(title_list)
+    del title_list['实体']
+import re
+g = rdflib.Graph()
+for c in title_list:
+    s = rdflib.URIRef(c)
+    for t in title_list[c]:
+        p = rdflib.URIRef('http://baike.com/resource/'+re.sub('\s','',t[0]))
+        o = rdflib.URIRef('http://baike.com/resource/'+re.sub('\s','',t[1]))
+        g.add((s,p,o))
+
+g.serialize('resource/hello.rdf',encoding="UTF-8")
+
+
+{
+    '__root__': {
+                'b': {'_val': 2,
+                     'f': {'_val': 1,
+                           'a': {'_val': 1, 
+                                 'm': {'_val': 1}
+                                }
+                          },
+                     'c': {'_val': 1, 
+                           'd': {'_val': 1,
+                                 'f': {'_val': 1}
+                                }, 
+                           'k': {'_val': 1,
+                                 'g': {'_val': 1}
+                                }
+                          }
+                      }, 
+                'c': {'_val': 1, 
+                      'k': {'_val': 1, 
+                            'g': {'_val': 1}
+                           }
+                     }, 
+                'f': {'_val': 1}}, 
+    '_val': 1
+}
+
 
 

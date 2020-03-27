@@ -213,7 +213,7 @@ class Nlp_data(object):
         self.words_to_id_res = val      
    
     # 分词、去除停用词、返回词列表，传入一段文字
-    def word_cut(self,text,typ='cn',file_path=r'E:\AI\selfTool/cn_stop.txt',stop=False):
+    def word_cut(self,text,typ='cn',file_path=r'/home/wcs/item/selfTool/resource/cn_stop.txt',stop=False):
       """args:
       text:一段文字；
       typ:语言类型，en：英文;
@@ -378,7 +378,7 @@ def get_batch(data,data_num=None,batch=1):
         yield batch_res
 
 #用于训练rnn网络的数据的特别batch
-def rnn_batch(data,batch=1):
+def rnn_batch(data,batch=1,start_token='',end_token=''):
     data_len = len(data[0])
     iter_numebr = math.ceil(data_len/batch)
 
@@ -387,8 +387,11 @@ def rnn_batch(data,batch=1):
     j = 0
     #最后一个迭代项不足batch数时也能使用 
     for c in range(iter_numebr):
-        x_batch = data[0][j:j+batch]
-        y_batch = data[1][j:j+batch]
+        _x_batch = data[0][j:j+batch]
+        _y_batch = data[1][j:j+batch]
+
+        x_batch = [[start_token] + pad + [end_token] for pad in _x_batch]
+        y_batch = [[start_token] + pad + [end_token] for pad in _y_batch]
 
         x_sequence = [np.shape(s)[0] for s in x_batch]
         
