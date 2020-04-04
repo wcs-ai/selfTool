@@ -52,20 +52,20 @@ def decode_byte(bt,decode=None):
     def _dec(st):
         try:
             rq = bt.decode(st)
-            return rq
+            return rq,st
         except:
             return False
 
     try:
         res = bt.decode(test)
-        return res
+        return res,test
     except:
         for i in encodings:
             td = _dec(i)
             if td!=False:
                 return td
                 break
-        return False
+        return False,False
 
 #读取大型文件时获取指定行
 def getLine(path,method='r',ed='utf-8',ord=0):

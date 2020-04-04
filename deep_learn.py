@@ -30,6 +30,7 @@ class __Basic_net__(object):
         self._info['gpu_config'].gpu_options.allow_growth = True
         self._info['gpu_config'].gpu_options.per_process_gpu_memory_fraction = 0.9
 
+
     @property
     def arg(self):
         return self._info
@@ -78,7 +79,7 @@ class __Basic_net__(object):
     def create_bias(self,size,dtype=None,name="bias"):
         dp = dtype or self._UNIFY_FLOAT
         with tf.device('/cpu:0'):
-            bias = tf.random_normal(shape=size,mean=0.1,stddev=0.2,dtype=dp,name=name)
+            bias = tf.random_normal(shape=size,mean=0,dtype=dp,name=name)
             variable = tf.get_variable(name=name,initializer=bias)
 
         return variable

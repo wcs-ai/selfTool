@@ -5,7 +5,7 @@ import queue, os
 import numpy as np
 import math, time
 import chardet,copy
-
+import re
 
 #多线程基类
 class _Multi_process(threading.Thread):
@@ -44,7 +44,7 @@ def look_encode(obj):
 #去除停用词,typ:cn为中文，en为英文
 def stop_word(words, typ='cn', file_path='selfTool/cn_stop.txt'):
     #停用词处理，传入数据格式：[(word,v),(),...],纯函数
-
+    # words：[word1,word2,...] 或者直接是一个词。
     # cn_stop = 'SELF_TOOLS/cn_stop.txt'
     # en_stop = 'SELF_TOOLS/en_stop.txt'
     # file_path = cn_stop if typ=='cn' else en_stop
@@ -57,16 +57,11 @@ def stop_word(words, typ='cn', file_path='selfTool/cn_stop.txt'):
     #words是一个列表的情况
     if isinstance(words, list) or isinstance(words, tuple):
         for i in words:
-            if isinstance(i, list) or isinstance(i, tuple):
-                if i[0] in stop_words:
-                    continue
-                else:
-                    arr.append(i)
+            # 在停用词表或带有数字的词会被剔除。
+            if i in stop_words or re.search('\s',i) or re.search('——',i) or re.search('^[\u4e00-\u9fa5]+$',i)==None:
+                continue
             else:
-                if i in stop_words:
-                    continue
-                else:
-                    arr.append(i)
+                arr.append(i)
     else:
         #传入的是一个字符的情况
         if words in stop_words:
@@ -93,6 +88,7 @@ def precision(x, y):
     ok = z.count(True)
     val = round(ok / leg)
     return val
+
 
 
 # 去除字符串中的一些换行符。。。

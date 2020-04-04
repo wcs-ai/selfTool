@@ -166,6 +166,7 @@ class Dispose(object):
                 else:
                     take_data.append(scaler.fit_transform(d))
         else:
+            d = dt
             if method=='norm':
                 take_data = scaler(d,norm='l2')
             else:
@@ -282,7 +283,7 @@ class Nlp_data(object):
         w_id['<pad>'] = 0
         id_w[0] = '<pad>'
 
-        self.words_id = w_id;
+        self.words_id = w_id
         if save:
           file.op_file(create_path+'/words_id.json',data=w_id,method='save')
           file.op_file(create_path+'/id_words.json',data=id_w,method='save')
@@ -495,8 +496,6 @@ def embedding_vector(vocab,module='baiki',module_path=None):
         pass
 
     return list(vocab_embed)
-
-
 
 
 
