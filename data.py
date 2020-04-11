@@ -284,6 +284,7 @@ class Nlp_data(object):
         id_w[0] = '<pad>'
 
         self.words_id = w_id
+        print('vocab_size:',len(w_id.keys()))
         if save:
           file.op_file(create_path+'/words_id.json',data=w_id,method='save')
           file.op_file(create_path+'/id_words.json',data=id_w,method='save')

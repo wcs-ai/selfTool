@@ -35,7 +35,6 @@ class Transformer:
         # self.token2idx, self.idx2token = load_vocab(hp.vocab)
         # 不是机器翻译模型时可使用cn相关。
         self.cn_embeddings = get_token_embeddings(hp.cn_vocab_size, hp.d_model, zero_pad=True)
-        self.en_embeddings = get_token_embeddings(hp.en_vocab_size, hp.d_model, zero_pad=True)
 
     @property
     def words_id(self):
@@ -169,10 +168,11 @@ class Transformer:
         ce = tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=y_)
         #基于权重的交叉熵计算
         loss = tf.reduce_sum(ce * nonpadding) / (tf.reduce_sum(nonpadding) + 1e-7)
+        look_loss = tf.reduce_mean(ce)
 
-        return loss
+        return loss,look_loss
 
-    def train(self, xs, ys,step):
+    def train(self, xs, ys,learn_rate=None):
         '''args:
         xs:ids data 2d.
         ys:3d.
@@ -183,25 +183,32 @@ class Transformer:
         summaries: training summary node
         '''
         # forward,训练中返回的sents1无用，只是配合评估时使用，可以去除。
-        en_masks = tf.equal(xs, 0)
+        en_masks = tf.equal(xs, self.token2idx['<pad>'])
         xs_enc = self.embedding_lookup(ids=xs,embedding=self.cn_embeddings)
 
         memory,src_masks = self.encode(xs_enc,en_masks)
 
-        y_input,y_target,y_len = ys
-        de_masks = tf.equal(y_target, 0)
+        y_input,y_target = ys
+        de_masks = tf.equal(y_target, self.token2idx['<pad>'])
         ys_enc = self.embedding_lookup(ids=y_input,embedding=self.cn_embeddings)
         logits, preds = self.decode(ys_enc, memory, src_masks,de_masks)
 
         
-        total_loss = self.calc_loss(y_target,logits)
+        total_loss,mean_loss = self.calc_loss(y_target,logits)
 
         global_step = tf.train.get_or_create_global_step()
 
         # noam_scheme()函数内封装的是自定义的学习率衰减公式，未知
-        lr = tf.train.exponential_decay(self.hp.lr, step, self.hp.warmup_steps,0.01)
+        if learn_rate==None:
+            lr = tf.train.polynomial_decay(learning_rate=self.hp.lr,
+                                            global_step=global_step,
+                                            decay_steps=self.hp.warmup_steps,
+                                            end_learning_rate=0.001)
+        else:
+            lr = learn_rate
+
         optimizer = tf.train.AdamOptimizer(lr)
-        train_op = optimizer.minimize(total_loss)
+        train_op = optimizer.minimize(total_loss,global_step=global_step)
 
         tf.summary.scalar('lr', lr)
         tf.summary.scalar("loss", total_loss)
@@ -209,7 +216,7 @@ class Transformer:
 
         summaries = tf.summary.merge_all()
         #返回损失值、梯度、步数、训练记录
-        return total_loss, train_op, global_step, lr
+        return mean_loss,train_op, global_step, lr
 
     def eval(self, xs, ys,words_id=None):
         '''Predicts autoregressively

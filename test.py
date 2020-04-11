@@ -1,3 +1,12 @@
+import sys,io
+sys.stdout=io.TextIOWrapper(sys.stdout.buffer,encoding='utf-8')
+import file as fl
+import re
+
+a = re.split(r'。|；|！|？','发动机岁离开。佛教的？附近的柯！附近的柯林；女郎经过。')
+print(a)
+#parser_pdf_file('/home/wcs/data/vv.pdf')
+
 """
 import numpy as np
 import requests,json
@@ -67,9 +76,6 @@ with open('/home/wcs/data/entity.csv','w') as et,open('/home/wcs/data/relation.c
 
         i += 1
 
-"""
-import sys,io
-sys.stdout=io.TextIOWrapper(sys.stdout.buffer,encoding='utf-8')
 from py2neo import Database,Graph,RelationshipMatcher,Node,Relationship
 #db = Database('http://127.0.0.1:7474')
 graph = Graph("http://127.0.0.1:7474",username="neo4j",password="neo4j")
@@ -90,3 +96,4 @@ jk = graph.match(list(m),"RELATIONSHIP")
 for i in jk:
     #print(i)
     print(i.start_node['name'],i.end_node['name'],dict(i))
+"""

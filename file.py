@@ -1,11 +1,10 @@
 #!/usr/bin/python
 #-*-coding:UTF-8-*-
 import os,queue
-
+import re
 import json,pickle
 import numpy as np
 from selfTool import common as cm
-
 
 
 #make json or pickle
@@ -102,6 +101,97 @@ def replace_file(fp='E:\AI\selfTool',tp='E:\AI\selfTool',dt=30):
                 copy(nf,os.path.join(tp,f))
             else:
                 continue
+
+
+
+class WPE_reader(object):
+    # 读取pdf,word文档，exe表格等文件。
+    def __init__(self,file_path):
+        self._file = file_path
+        self._allow_file_type = ['pdf','docx','csv','txt']
+        self._read_result = ''
+
+        self._judge_file(file_path)
+
+    def _judge_file(self,file_path):
+        # 判断文件是否存在和文件类型。
+        assert os.path.exists(file_path),'not fount {}'.format(file_path)
+
+        names = os.path.splitext(file_path)
+        assert names[1][1:] in self._allow_file_type,"dont be allowed file"
+
+        self._fileType = names[1][1:].lower()
+
+        if self._fileType=='docx':
+            self._docx()
+        elif self._fileType=='pdf':
+            self._pdf()
+        elif self._fileType=='csv':
+            self._csv()
+    
+
+    def _re_row(self,text):
+        t = re.sub('\n','。',text)
+        ex = re.sub('\s','，',t)
+        t = re.sub('\t','。',ex)
+
+        return t
+    
+    def _docx(self)->"read .doc file":
+        from docx import Document
+        from docx.shared import Inches
+
+        document = Document(self._file)
+
+        _ds = []
+        for p in document.paragraphs:
+            if not p:
+                continue
+            else:
+                _ds.append(self._re_row(p.text))
+        
+        self._read_result = _ds
+    
+    def _pdf(self)->"read .pdf file":
+        import pdfplumber
+        with pdfplumber.open(self._file) as pdf:
+            # 逐行读取。
+            _ps = []
+            for c in pdf.pages:
+                q = self._re_row(c.extract_text())
+                _ps.append(q)
+        
+        self._read_result = _ps
+    
+    def _csv(self):
+        import csv
+        #读取
+        c = open(self._file,'r')
+        reader = csv.reader(c)
+        _cs = []
+        for f in reader:
+            if f == '\x00':
+                continue
+            elif len(f)==0:
+                continue
+            else:
+                s = '。'.join(f)
+                _cs.append(self._re_row(s))
+ 
+        self._read_result = _cs
+    
+    def _txt(self):
+        with open(self._file,'r') as f:
+            _ts = []
+            for x in f:
+                b = self._re_row(x)
+                _ts.append(b)
+        
+        self._read_result = _ts
+
+            
+
+
 
 #replace_file(fp=r'/home/wcs/ITEM/selfTool',tp=r'/home/wcs/software/Anaconda/envs/wcs/lib/site-packages/selfTool')
 

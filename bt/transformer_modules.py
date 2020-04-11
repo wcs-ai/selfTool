@@ -10,7 +10,7 @@ Building blocks for Transformer
 
 import numpy as np
 import tensorflow as tf
-from tensorflow.contrib.layers.python.layers import batch_norm
+#from tensorflow.contrib.layers.python.layers import batch_norm
 
 def ln(inputs, epsilon = 1e-8, scope="ln"):
     '''Applies layer normalization. See https://arxiv.org/abs/1607.06450.
@@ -228,9 +228,10 @@ def ff(inputs, num_units, scope="positionwise_feedforward",training=True):
         # Normalize
         outputs = ln(outputs)
     
-    #return outputs
+    
     # 修改每个block结尾添加批量归一化和激活函数。
-    return batch_norm(outputs,decay=0.8,is_training=training,activation_fn=tf.nn.softmax)
+    #return batch_norm(outputs,decay=0.8,is_training=training,activation_fn=tf.nn.softmax)
+    return outputs
 
 def label_smoothing(inputs, epsilon=0.1):
     '''Applies label smoothing. See 5.4 and https://arxiv.org/abs/1512.00567.
