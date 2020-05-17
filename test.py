@@ -4,7 +4,7 @@ import file as fl
 import re
 
 a = re.split(r'。|；|！|？','发动机岁离开。佛教的？附近的柯！附近的柯林；女郎经过。')
-print(a)
+
 #parser_pdf_file('/home/wcs/data/vv.pdf')
 
 """
@@ -97,3 +97,43 @@ for i in jk:
     #print(i)
     print(i.start_node['name'],i.end_node['name'],dict(i))
 """
+
+
+###         特征选择
+from sklearn.feature_selection import SelectKBest,RFE,SelectFromModel
+import pandas as pd
+import scipy.stats as ss
+import numpy as np
+from sklearn.svm import SVR
+from sklearn.tree import DecisionTreeRegressor
+
+
+"""
+df = pd.DataFrame({
+    "A":ss.norm.rvs(size=10),
+    "B":ss.norm.rvs(size=10),
+    "C":ss.norm.rvs(size=10),
+    "D":np.random.randint(low=0,high=2,size=10)})
+
+x = df.loc[:,["A","B","C"]]
+y = df.loc[:,["D"]]
+skb = SelectKBest(k=2)
+skb.fit(x,y)
+m = skb.transform(x)
+
+rfe = RFE(estimator=SVR(kernel="linear"),n_features_to_select=2,step=1)#step是每次迭代减少的特征数
+rfe.fit_transform(x,y)
+
+sfm = SelectFromModel(estimator=DecisionTreeRegressor(),threshold=0.1)
+"""
+x = pd.DataFrame({"a":[0,1,2,3,4,5],"b":[5,7,9,3,4,10],"c":[5,7,9,3,4,10]})
+k = x.describe()
+
+a = np.random.normal(0,1,2200)
+b = ss.shapiro(a)
+c = ss.kstest(a,'norm')
+
+k = pd.read_csv('/home/wcs/data/cart_price/used_car_testB_20200421.csv')
+
+v = fl.WPE_reader('/home/wcs/data/cart_price/used_car_testB_20200421.csv')
+print(len(v._read_result[0].split('，')))

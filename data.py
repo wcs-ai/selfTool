@@ -13,6 +13,7 @@ import copy,tqdm
 import jieba
 import nltk
 from selfTool import file,common
+from scipy import stats
 
 #数据预处理模块
 class Dispose(object):
@@ -175,6 +176,120 @@ class Dispose(object):
         res_data = np.reshape(take_data,shape)
         return res_data
 
+
+#   数据探索性分析
+class DataExplorAnalysis(object):
+    # 要求输入的数据都是dataFrame形式的数据。
+    def __init__(self,data):
+        self._model = 'DataExplorAnalysis'
+        self._alter_data(data)
+
+    def _alter_data(self,data):
+        self._columns = data.columns
+        val = [None for i in range(len(self._columns))]
+        self._info = dict(zip(self._columns,val))
+        self._data = data
+    
+    @property
+    def DataFrame(self):
+        return self._data
+    @DataFrame.setter
+    def DataFrame(self,nd:'DataFrame'):
+        self._data = nd
+        self._alter_data(nd)
+
+    def _base(self):
+        _describe = self._data.describe()
+        for i in self._columns:
+            self._info[i] = dict(_describe[i])
+    
+    def _deviateValue(self,dt,mean):
+        """求偏态系数
+        dt:[2.5,3,...];
+        mean:scalar;
+        """
+        _molecular = 0
+        _denominator = 0
+        _num = len(dt)
+
+        for i in dt:
+            _molecular += np.power((i - mean),3)
+            _denominator += np.power((i - mean),2)
+        
+        _molecular = _molecular / _num
+        _denominator = np.power((_denominator / _num),1.5)
+
+        return _molecular / _denominator
+    
+    def _kurtosisValue(self,dt,mean):
+        """求峰态系数
+        
+        """
+        _molecular = 0
+        _denominator = 0
+        _num = len(dt)
+
+        for i in dt:
+            _molecular += np.power((i - mean),4)
+            _denominator += np.power((i - mean),2)
+        
+        _molecular = _molecular / _num
+        _denominator = np.power((_denominator / _num),2)
+
+        return _molecular / _denominator
+
+    def _addProperty(self):
+        # 添加方差、偏态系数等
+        for i in self._columns:
+            self._info[i]['var'] = np.power(self._info[i]['std'],2)
+            self._info[i]['deviate'] = self._deviateValue(self._data[i],self._info[i]['mean'])
+            self._info[i]['kurtosis'] = self._kurtosisValue(self._data[i],self._info[i]['mean'])
+            self._info[i]['median'] = np.median(self._data[i])
+            self._info[i]['mode'] = stats.mode(self._data[i])[0][0]
+    
+    def count_info(self,data=None):
+        # 计算各特征属性，data传入的话会重值统计信息。
+        if data!=None:
+            self._alter_data(data)
+        self._base()
+        self._addProperty()
+        return self._info
+    
+    def out(self,is_print=True,save=False,columns=None,filename="count_info.csv"):
+        """# 将各属性信息打印出来，保存为文件
+        args: 
+        is_print：是否在控制台打印。
+        save：是否保存文文件。
+        filename：文件路径。
+        columns：要打印的特征项，默认是全部。
+        """
+        P = 0.05
+        _cloumns = columns if columns!=None else self._columns
+
+        for c in _cloumns:
+            print("#####\t{}:".format(c))
+            print('数据条数:\t{}'.format(self._info[c]['count']))
+            print('最大值:\t{}'.format(self._info[c]['max']))
+            print('最小值:\t{}'.format(self._info[c]['min']))
+            print('均值:\t{}'.format(self._info[c]['mean']))
+            _deviateTip = "负偏态，大值多在右侧" if self._info[c]['deviate'] <0 else "正偏态，大值多在左侧"
+            _kurtosisTip = "不是正太分布" if abs(self._info[c]['kurtosis'] - 3) >2 else "近似正太分布"
+            print('偏态系数:\t{}({})'.format(self._info[c]['deviate'],_deviateTip))
+            print('峰态系数:\t{}({})'.format(self._info[c]['kurtosis'],_kurtosisTip))
+            print('中位数:\t{}'.format(self._info[c]['median']))
+            print('众数:\t{}'.format(self._info[c]['mode']))
+
+            if self._info[c]['count'] <= 2000:
+                _w = stats.shapiro(self._data[c])
+                _tip = "近似正态分布(近似度：{})".format(_w[0]) if _w[0]>0.5 and _w[1]>P else "不是正态分布"
+            else:
+                _ks = stats.kstest(rvs=self._data[c],cdf='norm')
+                _tip = "近似正态分布(近似度：{})".format(1 - _ks[0]) if _ks[0]<0.5 and _ks[1]>P else "不是正态分布"
+
+            print('正态性检验结果:\t' + _tip + '\n')
+
+    def relatedAnalysis(self):
+        # 相关性分析，生成相关性矩阵。
 
 # 专用于处理nlp数据
 class Nlp_data(object):

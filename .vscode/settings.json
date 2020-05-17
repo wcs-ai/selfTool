@@ -1,5 +1,5 @@
 {
-  "python.pythonPath": "/home/wcs/software/Anaconda/bin/python3.6",
+  "python.pythonPath": "/home/wcs/software/Anaconda/bin/python",
   "editor.fontSize": 16,
   "python.linting.pylintEnabled": false,
   "python.linting.banditEnabled": true,
