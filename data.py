@@ -182,6 +182,7 @@ class DataExplorAnalysis(object):
     # 要求输入的数据都是dataFrame形式的数据。
     def __init__(self,data):
         self._model = 'DataExplorAnalysis'
+        self._feature_data_type = None
         self._alter_data(data)
 
     def _alter_data(self,data):
@@ -288,8 +289,34 @@ class DataExplorAnalysis(object):
 
             print('正态性检验结果:\t' + _tip + '\n')
 
+    def _check_int_nums(self,dt:'[1,2,...]'):
+        _int_num = 0
+        _repeat_num = 0
+        _repeats_arr = []
+        for b in dt:
+            if b in _repeats_arr:
+                _repeat_num += 1
+            else:
+                _repeats_arr.append(b)
+
+            if b % 1==0:
+                _int_num += 1
+            else:
+                continue
+        # 整数个数、重复数据个数。
+        return [_int_num,_repeat_num]
+
     def relatedAnalysis(self):
         # 相关性分析，生成相关性矩阵。
+        # 0是离散型，1是连续型。
+        self._feature_data_type = {}
+        for i in self._columns:
+            _res = self._check_int_nums(self._data[i])
+            if _res[0] > self._info['count'] // 4 and _res[1] > self._info['count'] // 5:
+                self._feature_data_type[i] = 0
+            else:
+                self._feature_data_type[i] = 1
+
 
 # 专用于处理nlp数据
 class Nlp_data(object):
