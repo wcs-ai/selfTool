@@ -182,8 +182,21 @@ class DataExplorAnalysis(object):
     # 要求输入的数据都是dataFrame形式的数据。
     def __init__(self,data):
         self._model = 'DataExplorAnalysis'
+        """self._feature_data_type:
+        {
+            'feature1':0, #0：定类型数据、1：定序、2：定距、3：定比。
+        }
+        """
         self._feature_data_type = None
         self._alter_data(data)
+
+    # 定义一个可以主动更改各特征项数据类型的方法
+    @property
+    def featureType(self):
+        return self._feature_data_type
+    @featureType.setter
+    def featureType(self,val):
+        self._feature_data_type[val[0]] = val[1]
 
     def _alter_data(self,data):
         self._columns = data.columns
@@ -265,9 +278,9 @@ class DataExplorAnalysis(object):
         columns：要打印的特征项，默认是全部。
         """
         P = 0.05
-        _cloumns = columns if columns!=None else self._columns
+        _columns = columns if columns!=None else self._columns
 
-        for c in _cloumns:
+        for c in _columns:
             print("#####\t{}:".format(c))
             print('数据条数:\t{}'.format(self._info[c]['count']))
             print('最大值:\t{}'.format(self._info[c]['max']))
@@ -306,16 +319,20 @@ class DataExplorAnalysis(object):
         # 整数个数、重复数据个数。
         return [_int_num,_repeat_num]
 
-    def relatedAnalysis(self):
-        # 相关性分析，生成相关性矩阵。
-        # 0是离散型，1是连续型。
+    def _analysis_feature_type(self):
+        # 大体的判断各特征项数据类型。
         self._feature_data_type = {}
         for i in self._columns:
             _res = self._check_int_nums(self._data[i])
+            # 整型数大于1/4的数据且重复数据大于1/5就认为是离散型数据。
             if _res[0] > self._info['count'] // 4 and _res[1] > self._info['count'] // 5:
-                self._feature_data_type[i] = 0
-            else:
                 self._feature_data_type[i] = 1
+            else:
+                self._feature_data_type[i] = 3
+    
+    def relatedAnalysis(self):
+        # 相关性分析，生成相关性矩阵。
+        pass
 
 
 # 专用于处理nlp数据
