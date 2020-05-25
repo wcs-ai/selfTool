@@ -12,7 +12,7 @@ import math,re
 import copy,tqdm
 import jieba
 import nltk
-from selfTool import file,common
+from selfTool import file,common,usual_learn
 from scipy import stats
 
 #数据预处理模块
@@ -329,10 +329,49 @@ class DataExplorAnalysis(object):
                 self._feature_data_type[i] = 1
             else:
                 self._feature_data_type[i] = 3
-    
-    def relatedAnalysis(self):
+
+    def _command_fn(self,type1,type2):
+        # 根据数据类型推荐使用相关性计算方法
+        if (type1==0 and type2 < 2) or (type2==0 and type1 < 2):
+            return ['mutualInfo']
+        elif type1==1 and type2==1:
+            return ['spearman','kendal']
+        elif (type1==1 and type2 > 1) or (type2==1 and type1 > 1):
+            return ['pearson']
+        elif type1 > 1 and type2 > 1:
+            return ['pearson','cov']
+        else:
+            return [None]
+
+    def relatedAnalysis(self,columns=None,save=False,save_path='relation_array.csv'):
+        global usual_learn
         # 相关性分析，生成相关性矩阵。
-        pass
+        self._analysis_feature_type()
+
+        _columns = columns or self._columns
+        self._relationArray = np.zeros([len(_columns),len(_columns)],dtype=float)
+        _model = usual_learn.RelationCalc()
+
+        for a,f1 in enumerate(_columns):
+            for b,f2 in enumerate(_columns):
+                if a==b:
+                    self._relationArray[f1,f2] = 1
+                    continue
+                else:
+                    _fn = self._command_fn(self._feature_data_type[a],self._feature_data_type[b])
+                    if _fn[0]==None:
+                        self._relationArray[f1,f2] = '不支持'
+                    elif len(_fn)==1:
+                        self._relationArray[f1,f2] = _model.calc(self._data[a],self._data[b],fn_str=_fn[0])
+                    else:
+                        self._relationArray[f1,f2] = 0.6 * _model.calc(self._data[a],self._data[b],fn_str=_fn[0]) + \
+                                                     0.4 * _model.calc(self._data[a],self._data[b],fn_str=_fn[1])
+        if save==True:
+            v = file.WPE_op()
+            v.save(self._relationArray,save_path)
+
+        return self._relationArray
+
 
 
 # 专用于处理nlp数据
@@ -537,6 +576,7 @@ def get_batch(data,data_num=None,batch=1):
         batch_res = [i[j:j+batch] for i in data]
         j = j + batch
         yield batch_res
+
 
 #用于训练rnn网络的数据的特别batch
 def rnn_batch(data,batch=1,start_token='',end_token=''):
