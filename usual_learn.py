@@ -5,7 +5,8 @@ from sklearn.externals import joblib
 from sklearn.cluster import KMeans,MiniBatchKMeans
 from selfTool import file,data
 import decimal
-
+from scipy.stats import pearsonr,spearmanr,kendalltau
+import numpy as np
 
 """
 class DecimalEncoder(json.JSONEncoder):
@@ -285,20 +286,56 @@ class Layer_kmeans(object):
 				for g in sel_res:
 					self._search_result.append([dist_obj[g],{g:t[g]}])
 
+
+
+class AnalysisCalc(object):
+	def _pearson(self,x,y)->'皮尔逊相关系数':
+		_a = pearsonr(x,y)
+		return _a
+
+	def _spearman(self,x,y)->'斯皮尔曼系数':
+		_p = spearmanr(x,y,axis=0,nan_policy='omit')
+		return _p
+	
+	def _kendal(self,x,y)->'肯德尔系数':
+		_k = kendalltau(x,y,nan_policy='omit')
+		return _k
+	
+	def _cov(self,x,y):
+		_scalx = np.max(x) - np.mean(x)
+		_scaly = np.max(y) - np.mean(y)
+		# 映射到-1～1
+		return np.cov(x,y) / (_scalx * _scaly)
+	
+	def _mutualInfo(self,x,y)->'互信息计算':
+		_counter_x = dict()
+		_counter_y = dict()
+		_counter_xy = dict()
+
+		# 统计各项值出现的频率
+		def _counter(key,obj):
+			if key in obj:
+				obj[key] += 1
+			else:
+				obj[key] = 1
 		
+		for a,b in zip(x,y):
+			_key1 = str(a)
+			_key2 = str(b)
+			_key1_and_2 = _key1 + _key2
 
-			
+			_counter(_key1,_counter_x)
+			_counter(_key1_and_2,_counter_xy)
+			_counter(_key2,_counter_y)	
+		
+		_res = 0
+		for v in _counter_xy:
+			ks = v.split('-')
 
+			_pxy = _counter_xy[v]
+			_px = _counter_x[ks[0]]
+			_py = _counter_y[ks[1]]
 
-			
-
-
-
-
-
-
-
-
-
- 
-		 
+			_res += _pxy * np.log2(_pxy / (_px * _py))
+		
+		return _res

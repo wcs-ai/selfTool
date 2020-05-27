@@ -104,23 +104,17 @@ def replace_file(fp='E:\AI\selfTool',tp='E:\AI\selfTool',dt=30):
 
 
 
-class WPE_reader(object):
+
+class WPE_op(object):
     # 读取pdf,word文档，exe表格等文件。
-    def __init__(self,file_path):
-        self._file = file_path
+    def __init__(self):
+        self._file = ''
         self._allow_file_type = ['pdf','docx','csv','txt']
         self._read_result = ''
 
+    def read(self,file_path):
+        self._file = file_path
         self._judge_file(file_path)
-
-    def _judge_file(self,file_path):
-        # 判断文件是否存在和文件类型。
-        assert os.path.exists(file_path),'not fount {}'.format(file_path)
-
-        names = os.path.splitext(file_path)
-        assert names[1][1:] in self._allow_file_type,"dont be allowed file"
-
-        self._fileType = names[1][1:].lower()
 
         if self._fileType=='docx':
             self._docx()
@@ -129,6 +123,21 @@ class WPE_reader(object):
         elif self._fileType=='csv':
             self._csv()
     
+    def save(self,dt,filname='wpe.csv'):
+ 
+        self._judge_file(filname)
+        if self._fileType=='csv':
+            self.__csv(dt,filname)
+
+    def _judge_file(self,file_path):
+        # 判断文件是否存在和文件类型。
+        #assert os.path.exists(file_path),'not fount {}'.format(file_path)
+
+        names = os.path.splitext(file_path)
+        assert names[1][1:] in self._allow_file_type,"dont be allowed file"
+
+        self._fileType = names[1][1:].lower()
+    
 
     def _re_row(self,text):
         t = re.sub('\n','。',text)
@@ -136,7 +145,23 @@ class WPE_reader(object):
         t = re.sub('\t','。',ex)
 
         return t
-    
+
+    def __csv(self,dt,file_path="csvfile.csv")->'save csv file':
+        import csv
+        _shape = np.shape(dt)
+
+        with open(file_path,'w') as w:
+            #delimiter可以设置每列值之间使用的隔开符，默认是每个值占一格。
+            writer = csv.writer(w)
+            if len(_shape)==1:
+                writer.writerow(['id','name','val'])#写入一行。
+            elif len(_shape)==2:
+                #writerows()同时写入多行
+                writer.writerows(dt)
+            else:
+                raise ValueError('too many dimension')
+
+
     def _docx(self)->"read .doc file":
         from docx import Document
         from docx.shared import Inches

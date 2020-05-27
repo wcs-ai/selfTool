@@ -129,11 +129,6 @@ sfm = SelectFromModel(estimator=DecisionTreeRegressor(),threshold=0.1)
 x = pd.DataFrame({"a":[0,1,2,3,4,5],"b":[5,7,9,3,4,10],"c":[5,7,9,3,4,10]})
 k = x.describe()
 
-a = np.random.normal(0,1,2200)
-b = ss.shapiro(a)
-c = ss.kstest(a,'norm')
-
-k = pd.read_csv('/home/wcs/data/cart_price/used_car_testB_20200421.csv')
-
-v = fl.WPE_reader('/home/wcs/data/cart_price/used_car_testB_20200421.csv')
-print(len(v._read_result[0].split('，')))
+def up(a,**c):
+    print(c)
+up(1,f=5,b=10)
