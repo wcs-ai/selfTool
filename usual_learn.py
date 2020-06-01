@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 from sklearn.naive_bayes import MultinomialNB,GaussianNB,BernoulliNB,ComplementNB
-from sklearn.externals import joblib
+from sklearn.utils import _joblib
 from sklearn.cluster import KMeans,MiniBatchKMeans
 from selfTool import file,data
 import decimal
@@ -35,10 +35,10 @@ class bayes(object):
 		self.model.fit(data,target)
 
 	def save_model(self,path):
-		joblib.dump(self.model,path)
+		_joblib.dump(self.model,path)
 
 	def load_model(self,path):
-		self.model = joblib.load(path)
+		self.model = _joblib.load(path)
 
 	def predict(self,x):
 		res = self.model.predict(x)
@@ -288,7 +288,8 @@ class Layer_kmeans(object):
 
 
 
-class AnalysisCalc(object):
+class RelationCalc(object):
+    # 相关性计算,不能含有缺失值。
 	def _pearson(self,x,y)->'皮尔逊相关系数':
 		_a = pearsonr(x,y)
 		return _a
@@ -322,7 +323,7 @@ class AnalysisCalc(object):
 		for a,b in zip(x,y):
 			_key1 = str(a)
 			_key2 = str(b)
-			_key1_and_2 = _key1 + _key2
+			_key1_and_2 = _key1 + '-' + _key2
 
 			_counter(_key1,_counter_x)
 			_counter(_key1_and_2,_counter_xy)
@@ -339,3 +340,17 @@ class AnalysisCalc(object):
 			_res += _pxy * np.log2(_pxy / (_px * _py))
 		
 		return _res
+
+	def calc(self,d1,d2,fn_str='pearson'):
+		if fn_str=='pearson':
+			q = self._pearson(d1,d2)
+		elif fn_str=='spearman':
+			q = self._spearman(d1,d2)
+		elif fn_str=='cov':
+			q = self._cov(d1,d2)
+		elif fn_str=='mutualInfo':
+			q = self._mutualInfo(d1,d2)
+		else:
+			raise ValueError('dont support {}'.format(fn_str))
+		
+		return q

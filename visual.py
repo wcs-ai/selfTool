@@ -50,22 +50,6 @@ import plotly.graph_objs as go
 from plotly.graph_objs import Scatter,Layout
 
 
-labels = ['产品1','产品2','产品3','产品4','产品5']
-values = [38.7,15.33,19.9,8.6,17.47]
-#    饼图与上面稍有不同
-trace2 = [go.Pie(labels=labels, 
-				values=values,
-				#hole=0.7,	#绘制成同心圆
-				hoverinfo = 'label+percent', 
-				pull = [0.1,0,0,0,0],#设置各部分的突出程度。
-                textinfo = 'percent', # textinfo = 'value',
-                textfont = dict(size = 30, color = 'white'),
-				#	设置各元素属性。line设置边框属性。
-				marker=dict(colors=['#FFFF00', '#FF0000', '#E066FF', '#0D0D0D'],
-							line=dict(color = '#000000', width = 2)
-							)
-				)]
-
 
 class PlotlyDraw(object):
     _DICCRIBE = "plotly绘图"
@@ -84,8 +68,6 @@ class PlotlyDraw(object):
 	            "plot_bgcolor":'#E6E6FA',#图的背景颜色
                 "paper_bgcolor":'#F8F8FF',#图像的背景颜色
                 "autosize":True,
-                "width":1200,
-                "height":800,
 	            "yaxis2":dict(title="大数值", overlaying='y', side="right")
             },
             # layout中axis,yaxis属性示例。
@@ -123,7 +105,6 @@ class PlotlyDraw(object):
                         y=y,
                         mode=mode,
                         name=name,
-                        yaxis="y1",
                         text='p',
                         textposition='bottom center',
                         textfont={'size': 12},  
@@ -153,13 +134,14 @@ class PlotlyDraw(object):
 
         for ix,d in enumerate(datas):
             # 没有传入图列的情况。
-            if not d['graph']:
-                assert type(d['args'])==dict,'query argument:args'
+            if 'graph' not in d:
+                #assert type(d['args'])==dict,'query argument:args'
                 if d['graph_type']=='scatter':
                     
                     d['graph'] = self.scatter(x=d['x'],y=d['y'])
                 elif d['graph_type']=='bar':
                     d['graph'] = self.bar(x=d['x'],y=d['y'])
+
             self._config['layout']['xaxis{}'.format(ix + 1)] = self._config['axis']
             self._config['layout']['yaxis{}'.format(ix + 1)] = self._config['axis']
 
@@ -170,6 +152,7 @@ class PlotlyDraw(object):
             else:
                 _row = math.ceil(_use_row / 2)
                 _col = 2 if _use_row % 2==0 else 1
+
             _fig.add_trace(d['graph'],row=_row,col=_col)
 
         _fig['layout'].update(self._config['layout'])

@@ -12,7 +12,7 @@ import math,re
 import copy,tqdm
 import jieba
 import nltk
-from selfTool import file,common,usual_learn
+from selfTool import file,common
 from scipy import stats
 
 #数据预处理模块
@@ -57,7 +57,7 @@ class Dispose(object):
                     miss_index_arr.append(v1)
         return miss_index_arr
 
-    def _window_data(self,data,idx,window):
+    def _window_data(self,data,idx,window=5):
         """求出idx附近可用的值
         args:
         data:1d;
@@ -86,7 +86,6 @@ class Dispose(object):
 
     def _mean(self,data):
         """用来计算指定数据的均值。
-        
         """
         
         if len(data)==0:
@@ -95,54 +94,157 @@ class Dispose(object):
             res = np.mean(data, axis=0)
         return res
 
+    def checkOutliersAndNone(self,x,method='box',discrete=None,scope=None):
+        """检测异常值和None值。会连缺失值一起算在内。 
+        x:[1,2,3,...];
+        method:3a(3a原则),box(箱形图);
+        discrete:method为非box和3a时使用。
+        """
+        _arr = pd.DataFrame({'data':list(x)})
+        if method=='3a':
+            _std = np.std(x)
+            _outliers = _arr['data'][_arr['data']>3*_std].index
+        
+            # 一维特征情况可直接使用index当目标索引。
+        elif method=='box':
+            #箱形图，四分位点，外限点。
+            _hig = np.quantile(x,0.75,interpolation='lower')
+            _lower = np.quantile(x,0.25,interpolation='higher')
+            _val = 3 * (_hig - _lower)
+            _outliers = _arr['data'][(_arr['data']>(_hig + _val))|(_arr['data']<(_lower - _val))].index
+        elif method=='scope':
+            # 先验知识，指定数据范围
+            _outliers = _arr['data'][(_arr['data']<scope[0])|(_arr['data']>scope[1])].index
+        elif method=='discrete':
+            # 对离散型数据做异常值检测
+            _outliers = []
+            assert discrete != None,'query discrete'
+            #_outliers = _arr['data'][_arr['data'].isin(discrete)].index
+            for ix,val in enumerate(x):
+                if val not in discrete:
+                    _outliers.append(ix)
+        else:
+            _outliers = []
+        
+        _none_val = _arr['data'][_arr['data'].isnull()].index
+        # 返回异常值所在索引,和缺失值所在索引。       
+        _all_set = set(list(_outliers))
+        _non_set = set(list(_none_val))
+        _out_set = _all_set - _non_set
+        
+        return (list(_out_set),list(_non_set))
     
-    def interpolate(self,data,axis=1,method="mean",place=0):
-        """对给定缺失值类型进行插值.
-        args:
-        data:2d.
-        axis:插值方法选择的指定维度数据作为插值参考。0为选择行。
-        method:插值方法.
-        place:没有好的插值方案时使用的占位值.
+    
+    def batch_checkOutliersAndNone(self,dt,query_print=False,**args):
+        """批量检测异常值
+        data:pd.DataFrame();
+        args:{
+            "discrete":[{"name":'a',val:[1,2]},...],
+            "scope":[{"name":'a',val:[1.2,...]}],
+            "box":[],
+            "3a":[]
+        }
+        """
+        _res_list = []
+        for key in args:
+            for d in args[key]:
+                if key=='discrete':
+                    _res = self.checkOutliersAndNone(x=dt[d['name']],method=key,discrete=d['val'])
+                elif key=='scope':
+                    _res = self.checkOutliersAndNone(x=dt[d['name']],method=key,scope=d['val'])
+                else:
+                    _res = self.checkOutliersAndNone(x=dt[d['name']],method=key)
+                    
+                _res_list.append({"name":d['name'],"outliers":_res[0],"nons":_res[1]})
+                
+                if query_print==True:
+                    print('{}：异常值=>{}条;缺失值=>{}条;part value=>{}'.format(d['name'],len(_res[0]),len(_res[1]),dt[d['name']][_res[0][0:10]]))
+        
+        return _res_list
+            
+    
+    def _alone_var_interpolate(self,x,method="lagrange"):
+        """单变量插补,建议连续型数据使用。
+        x:[1,2,3,4,5]#np.ndarry()
         """
         from scipy.interpolate import lagrange
-
-        self.place = place
-        if type(data)==list or type(data)==tuple:
-            dt = np.array(data)
-        elif type(data)==pd.core.frame.DataFrame:
-            dt = np.array(data.values)
-        else:
-            dt = data
-        # 查询数据中的缺失值位置。
-        dim = 2 if len(dt.shape)>1 else 1
-        miss_idx = self.search_miss(dt)
+        
+        _list_val = list(x.values)
+        miss_idx = self.search_miss(_list_val)
         
         for val in miss_idx:
-            if dim==1:
-                send_dt = dt
-                pt = val
-            else:
-                # 判断维度选择参考数据。
-                if axis==0:
-                    send_dt = dt[val[0]]
-                    pt = val[1]
-                else:
-                    send_dt = dt[:,val[1]]
-                    pt = val[0]
-            
-            _apply_data,idxs = self._window_data(send_dt,pt)
+            # 查找缺失值附近可用的值。
+            _apply_data,idxs = self._window_data(_list_val,val,window=100)
             #判断插值方法,mean:使用缺失值附近的数据的均值代替
             if method=='mean':
                 res = self._mean(_apply_data)
             elif method=='lagrange':
-                res = lagrange(idxs,_apply_data)(pt)
+                res = lagrange(idxs,_apply_data)(val)
+            
+            x[:][val] = res
+        
+        return x
+    
+    def _multi_var_interpolate(self,dt,use_columns,target,method="knn"):
+        """多变量插补,要求其它维特征没有缺失值。
+        x：可以是1d或2d。
+        y：要插值的特征列。
+        """
+        from sklearn.neighbors import KNeighborsClassifier
+        
+        assert isinstance(dt, pd.core.frame.DataFrame),'dt must be pd.core.frame.DataFrame'
 
-            #将结果插入数据中
-            if dim==1:
-                dt[val] = res
-            else:
-                dt[val[0]][val[1]] = res
+        # 对一维数据做了扩维处理
+        if len(use_columns)==1:
+            __x = [[0,i] for i in dt[use_columns[0]]]
+            dt[use_columns[0]] = __x
+            #_x = pd.DataFrame({_x.columns[0]:__x})
+ 
+        #选出拟合用的数据
+        _fit_indexs = list(dt[target][dt[target].notnull()].index)
+        _none_indexs = list(dt[target][dt[target].isnull()].index)
+
+        _fitx = dt.loc[_fit_indexs][use_columns].values
+        _fity = dt.loc[_fit_indexs][target].values
+        
+        assert None not in _fitx,'_fitx exist None'
+        assert None not in _fity,'_fity exist None'
+        
+        if method=='knn':
+            # 最近邻分类插值。
+            c_knn=KNeighborsClassifier(n_neighbors=3,#返回候选个数
+                        algorithm='auto',
+                        leaf_size=30,
+                        weights='uniform')
+            print('eeee====>',use_columns)
+            c_knn.fit(_fitx,_fity)
+            _pred = c_knn.predict(dt.loc[_none_indexs][use_columns].values)
+        
+        dt.loc[_none_indexs][target] = _pred
+        # 返回目标列插值结果。
         return dt
+
+        
+    def interpolate(self,dt,use_columns=None,target='y',model='alone',method="mean"):
+        """对给定缺失值类型进行插值.
+        args:
+        data:2d；model为alone时需要1d，multi时需要为pd.DataFrame()二维。
+        target:选择多变量插补时需要，要插值的目标列
+        method:插值方法.
+        model:'alone'=>单变量插值。'multi'=>多变量插值。
+        place:没有好的插值方案时使用的占位值.
+        """
+        import copy
+
+        if model=='alone':
+            if type(dt)==list or type(dt)==tuple or type(dt)==np.ndarray:
+                dt = pd.DataFrame({'a':dt})
+
+            _res = self._alone_var_interpolate(dt,method=method)
+        else:
+            _res = self._multi_var_interpolate(dt,use_columns=use_columns,target=target,method=method)
+        
+        return _res
     
     #数据规范化
     def norm_data(self,data,query_shape,method='norm'):
@@ -187,21 +289,14 @@ class DataExplorAnalysis(object):
             'feature1':0, #0：定类型数据、1：定序、2：定距、3：定比。
         }
         """
-        self._feature_data_type = None
+        self._feature_data_type = {}
         self._alter_data(data)
 
-    # 定义一个可以主动更改各特征项数据类型的方法
-    @property
-    def featureType(self):
-        return self._feature_data_type
-    @featureType.setter
-    def featureType(self,val):
-        self._feature_data_type[val[0]] = val[1]
 
     def _alter_data(self,data):
         self._columns = data.columns
         val = [None for i in range(len(self._columns))]
-        self._info = dict(zip(self._columns,val))
+        self._info = dict(zip(list(self._columns),val))
         self._data = data
     
     @property
@@ -214,6 +309,7 @@ class DataExplorAnalysis(object):
 
     def _base(self):
         _describe = self._data.describe()
+
         for i in self._columns:
             self._info[i] = dict(_describe[i])
     
@@ -261,7 +357,7 @@ class DataExplorAnalysis(object):
             self._info[i]['median'] = np.median(self._data[i])
             self._info[i]['mode'] = stats.mode(self._data[i])[0][0]
     
-    def count_info(self,data=None):
+    def _all_info(self,data=None):
         # 计算各特征属性，data传入的话会重值统计信息。
         if data!=None:
             self._alter_data(data)
@@ -269,7 +365,7 @@ class DataExplorAnalysis(object):
         self._addProperty()
         return self._info
     
-    def out(self,is_print=True,save=False,columns=None,filename="count_info.csv"):
+    def count_info(self,is_print=True,save=False,columns=None,filename="count_info.csv"):
         """# 将各属性信息打印出来，保存为文件
         args: 
         is_print：是否在控制台打印。
@@ -277,36 +373,59 @@ class DataExplorAnalysis(object):
         filename：文件路径。
         columns：要打印的特征项，默认是全部。
         """
+        self._all_info()
         P = 0.05
         _columns = columns if columns!=None else self._columns
+        _infos = dict()
 
         for c in _columns:
-            print("#####\t{}:".format(c))
-            print('数据条数:\t{}'.format(self._info[c]['count']))
-            print('最大值:\t{}'.format(self._info[c]['max']))
-            print('最小值:\t{}'.format(self._info[c]['min']))
-            print('均值:\t{}'.format(self._info[c]['mean']))
-            _deviateTip = "负偏态，大值多在右侧" if self._info[c]['deviate'] <0 else "正偏态，大值多在左侧"
+            _deviateTip = "负偏态，大值多在右侧" if self._info[c]['deviate']<0 else "正偏态，大值多在左侧"
             _kurtosisTip = "不是正太分布" if abs(self._info[c]['kurtosis'] - 3) >2 else "近似正太分布"
-            print('偏态系数:\t{}({})'.format(self._info[c]['deviate'],_deviateTip))
-            print('峰态系数:\t{}({})'.format(self._info[c]['kurtosis'],_kurtosisTip))
-            print('中位数:\t{}'.format(self._info[c]['median']))
-            print('众数:\t{}'.format(self._info[c]['mode']))
-
+            
             if self._info[c]['count'] <= 2000:
                 _w = stats.shapiro(self._data[c])
                 _tip = "近似正态分布(近似度：{})".format(_w[0]) if _w[0]>0.5 and _w[1]>P else "不是正态分布"
             else:
                 _ks = stats.kstest(rvs=self._data[c],cdf='norm')
                 _tip = "近似正态分布(近似度：{})".format(1 - _ks[0]) if _ks[0]<0.5 and _ks[1]>P else "不是正态分布"
+            
+            _infos[c] = [self._info[c]['max'],
+                         self._info[c]['min'],
+                         self._info[c]['mean'],
+                         self._info[c]['deviate'],
+                         self._info[c]['kurtosis'],
+                         self._info[c]['median'],
+                         self._info[c]['mode'],
+                         _tip,
+                         self._info[c]['count']]
+            
+            if is_print==True:
+                print("#####\t{}:".format(c))
+                print('数据条数:\t{}'.format(self._info[c]['count']))
+                print('最大值:\t{}'.format(self._info[c]['max']))
+                print('最小值:\t{}'.format(self._info[c]['min']))
+                print('均值:\t{}'.format(self._info[c]['mean']))
+            
+                print('偏态系数:\t{}({})'.format(self._info[c]['deviate'],_deviateTip))
+                print('峰态系数:\t{}({})'.format(self._info[c]['kurtosis'],_kurtosisTip))
+                print('中位数:\t{}'.format(self._info[c]['median']))
+                print('众数:\t{}'.format(self._info[c]['mode']))
+                
+                print('正态性检验结果:\t' + _tip + '\n')
+            
+            if save==True:
+                _data_info = pd.DataFrame(_infos,index=['最大值','最小值','均值','偏态系数','峰态系数','中位数','众数','正态性','数据量'])
+                _data_info.to_csv(filename)
 
-            print('正态性检验结果:\t' + _tip + '\n')
+            
 
     def _check_int_nums(self,dt:'[1,2,...]'):
         _int_num = 0
         _repeat_num = 0
         _repeats_arr = []
-        for b in dt:
+        _data = dt[0:2000] if len(dt)>2000 else dt
+        
+        for b in _data:
             if b in _repeats_arr:
                 _repeat_num += 1
             else:
@@ -319,13 +438,13 @@ class DataExplorAnalysis(object):
         # 整数个数、重复数据个数。
         return [_int_num,_repeat_num]
 
-    def _analysis_feature_type(self):
+    def analysis_feature_type(self):
         # 大体的判断各特征项数据类型。
         self._feature_data_type = {}
         for i in self._columns:
-            _res = self._check_int_nums(self._data[i])
+            _res = self._check_int_nums(self._data[i].values)
             # 整型数大于1/4的数据且重复数据大于1/5就认为是离散型数据。
-            if _res[0] > self._info['count'] // 4 and _res[1] > self._info['count'] // 5:
+            if _res[0] > self._info[i]['count'] // 4 and _res[1] > self._info[i]['count'] // 5:
                 self._feature_data_type[i] = 1
             else:
                 self._feature_data_type[i] = 3
@@ -344,9 +463,8 @@ class DataExplorAnalysis(object):
             return [None]
 
     def relatedAnalysis(self,columns=None,save=False,save_path='relation_array.csv'):
-        global usual_learn
+        from selfTool import usual_learn
         # 相关性分析，生成相关性矩阵。
-        self._analysis_feature_type()
 
         _columns = columns or self._columns
         self._relationArray = np.zeros([len(_columns),len(_columns)],dtype=float)
@@ -355,22 +473,22 @@ class DataExplorAnalysis(object):
         for a,f1 in enumerate(_columns):
             for b,f2 in enumerate(_columns):
                 if a==b:
-                    self._relationArray[f1,f2] = 1
+                    self._relationArray[a,b] = 1
                     continue
                 else:
-                    _fn = self._command_fn(self._feature_data_type[a],self._feature_data_type[b])
+                    _fn = self._command_fn(self._feature_data_type[f1],self._feature_data_type[f2])
                     if _fn[0]==None:
-                        self._relationArray[f1,f2] = '不支持'
+                        self._relationArray[a,b] = None
                     elif len(_fn)==1:
-                        self._relationArray[f1,f2] = _model.calc(self._data[a],self._data[b],fn_str=_fn[0])
+                        self._relationArray[a,b] = _model.calc(self._data[f1],self._data[f2],fn_str=_fn[0])
                     else:
-                        self._relationArray[f1,f2] = 0.6 * _model.calc(self._data[a],self._data[b],fn_str=_fn[0]) + \
-                                                     0.4 * _model.calc(self._data[a],self._data[b],fn_str=_fn[1])
+                        self._relationArray[a,b] = 0.6 * _model.calc(self._data[f1],self._data[f2],fn_str=_fn[0]) + \
+                                                     0.4 * _model.calc(self._data[f1],self._data[f2],fn_str=_fn[1])
+        _save_data = pd.DataFrame(self._relationArray,columns=_columns,index=_columns)
         if save==True:
-            v = file.WPE_op()
-            v.save(self._relationArray,save_path)
+            _save_data.to_csv(save_path)
 
-        return self._relationArray
+        return _save_data
 
 
 

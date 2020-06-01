@@ -3,5 +3,7 @@
   "editor.fontSize": 16,
   "python.linting.pylintEnabled": true,
   "python.linting.banditEnabled": false,
-  "python.linting.enabled": true
+  "python.linting.enabled": true,
+  "python.jediEnabled": true,
+  "python.autoComplete.addBrackets": true
 }
