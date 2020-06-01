@@ -289,7 +289,7 @@ class Layer_kmeans(object):
 
 
 class RelationCalc(object):
-    # 相关性计算,不能含有缺失值。
+
 	def _pearson(self,x,y)->'皮尔逊相关系数':
 		_a = pearsonr(x,y)
 		return _a
@@ -323,6 +323,7 @@ class RelationCalc(object):
 		for a,b in zip(x,y):
 			_key1 = str(a)
 			_key2 = str(b)
+
 			_key1_and_2 = _key1 + '-' + _key2
 
 			_counter(_key1,_counter_x)
@@ -354,3 +355,4 @@ class RelationCalc(object):
 			raise ValueError('dont support {}'.format(fn_str))
 		
 		return q
+

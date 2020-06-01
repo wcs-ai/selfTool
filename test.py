@@ -131,10 +131,3 @@ x = pd.DataFrame({"a":[1,3,4,0,None,2],"b":[0,0,None,3,None,17],"c":[2,7,7,5.3,4
 
 from sklearn.neighbors import NearestNeighbors,KNeighborsClassifier
 
-a = pd.Series(data=[[1,2,3],[4,5,6]],index=['a','b'])
-
-b = pd.DataFrame([[1,2],[5,6],[5.5,6.2],[6.5,4.3],[8.2,1.9],[7,0]],columns=['a','b'])
-
-#print(x[['b','c']][0])
-#print(x.loc[[0,1]][['a','c']])
-print(x['c'].describe())

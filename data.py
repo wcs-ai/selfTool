@@ -12,7 +12,7 @@ import math,re
 import copy,tqdm
 import jieba
 import nltk
-from selfTool import file,common
+from selfTool import file,common,usual_learn
 from scipy import stats
 
 #数据预处理模块
@@ -216,7 +216,6 @@ class Dispose(object):
                         algorithm='auto',
                         leaf_size=30,
                         weights='uniform')
-            print('eeee====>',use_columns)
             c_knn.fit(_fitx,_fity)
             _pred = c_knn.predict(dt.loc[_none_indexs][use_columns].values)
         
@@ -291,7 +290,6 @@ class DataExplorAnalysis(object):
         """
         self._feature_data_type = {}
         self._alter_data(data)
-
 
     def _alter_data(self,data):
         self._columns = data.columns
@@ -376,7 +374,22 @@ class DataExplorAnalysis(object):
         self._all_info()
         P = 0.05
         _columns = columns if columns!=None else self._columns
+
         _infos = dict()
+        
+        for c in _columns:
+            print("#####\t{}:".format(c))
+            print('数据条数:\t{}'.format(self._info[c]['count']))
+            print('最大值:\t{}'.format(self._info[c]['max']))
+            print('最小值:\t{}'.format(self._info[c]['min']))
+            print('均值:\t{}'.format(self._info[c]['mean']))
+            _deviateTip = "负偏态，大值多在右侧" if self._info[c]['deviate'] <0 else "正偏态，大值多在左侧"
+            _kurtosisTip = "不是正太分布" if abs(self._info[c]['kurtosis'] - 3) >2 else "近似正太分布"
+            print('偏态系数:\t{}({})'.format(self._info[c]['deviate'],_deviateTip))
+            print('峰态系数:\t{}({})'.format(self._info[c]['kurtosis'],_kurtosisTip))
+            print('中位数:\t{}'.format(self._info[c]['median']))
+            print('众数:\t{}'.format(self._info[c]['mode']))
+
 
         for c in _columns:
             _deviateTip = "负偏态，大值多在右侧" if self._info[c]['deviate']<0 else "正偏态，大值多在左侧"
@@ -445,6 +458,7 @@ class DataExplorAnalysis(object):
             _res = self._check_int_nums(self._data[i].values)
             # 整型数大于1/4的数据且重复数据大于1/5就认为是离散型数据。
             if _res[0] > self._info[i]['count'] // 4 and _res[1] > self._info[i]['count'] // 5:
+
                 self._feature_data_type[i] = 1
             else:
                 self._feature_data_type[i] = 3
@@ -489,6 +503,7 @@ class DataExplorAnalysis(object):
             _save_data.to_csv(save_path)
 
         return _save_data
+
 
 
 
