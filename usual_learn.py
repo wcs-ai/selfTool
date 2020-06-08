@@ -306,13 +306,16 @@ class RelationCalc(object):
 		_scalx = np.max(x) - np.mean(x)
 		_scaly = np.max(y) - np.mean(y)
 		# 映射到-1～1
-		return np.cov(x,y) / (_scalx * _scaly)
+		return np.cov(x,y)[0][1] / (_scalx * _scaly)
 	
 	def _mutualInfo(self,x,y)->'互信息计算':
 		_counter_x = dict()
 		_counter_y = dict()
 		_counter_xy = dict()
 
+		assert len(x)==len(y),'x unequal y'
+  
+		NUMS = len(x)
 		# 统计各项值出现的频率
 		def _counter(key,obj):
 			if key in obj:
@@ -330,13 +333,17 @@ class RelationCalc(object):
 			_counter(_key1_and_2,_counter_xy)
 			_counter(_key2,_counter_y)	
 		
+		XY_NUMS = 0
+		for i in _counter_xy:
+			XY_NUMS += _counter_xy[i]
+		# 计算互信息值
 		_res = 0
 		for v in _counter_xy:
 			ks = v.split('-')
 
-			_pxy = _counter_xy[v]
-			_px = _counter_x[ks[0]]
-			_py = _counter_y[ks[1]]
+			_pxy = _counter_xy[v] / XY_NUMS
+			_px = _counter_x[ks[0]] / NUMS
+			_py = _counter_y[ks[1]] / NUMS
 
 			_res += _pxy * np.log2(_pxy / (_px * _py))
 		
@@ -344,9 +351,11 @@ class RelationCalc(object):
 
 	def calc(self,d1,d2,fn_str='pearson'):
 		if fn_str=='pearson':
-			q = self._pearson(d1,d2)
+			q = self._pearson(d1,d2)[0]
 		elif fn_str=='spearman':
-			q = self._spearman(d1,d2)
+			q = self._spearman(d1,d2)[0]
+		elif fn_str=='kendal':
+			q = self._kendal(d1,d2)[0]
 		elif fn_str=='cov':
 			q = self._cov(d1,d2)
 		elif fn_str=='mutualInfo':

@@ -126,8 +126,30 @@ rfe.fit_transform(x,y)
 
 sfm = SelectFromModel(estimator=DecisionTreeRegressor(),threshold=0.1)
 """
-x = pd.DataFrame({"a":[1,3,4,0,None,2],"b":[0,0,None,3,None,17],"c":[2,7,7,5.3,4.1,2]})
+x = pd.DataFrame({"a":[1.0,2,4,0,9,1.0],"b":[1.0,0,0,7,6,1],"c":[1.0,2,7,5.3,4.1,1.0]})
 
+from sklearn.preprocessing import *
 
-from sklearn.neighbors import NearestNeighbors,KNeighborsClassifier
+ux = [[12, 57.2,  153.8],
+    [0,  8,  2],
+    [5.1,  7.2, -8.9]]
+
+vx = [[0.1,1.2,1.3,4.5,6,10.2,11.5, 50.2,66.7,90.8,100.5,110]]
+
+cc = np.array([8.3,2.1,5.4,9.0,0.5,0.1,0.23,1.45,6.0,7.1,2.2])
+p = cc * 10
+print(p)
+print(np.log(p))
+"""
+import tensorflow as tf
+
+x = tf.constant([1,2,3])
+y = tf.constant([4,5,6])
+
+with tf.device('/gpu:0'):
+    z = x + y
+s = tf.Session()
+print(s.run(z))
+"""
+
 

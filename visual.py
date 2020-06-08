@@ -137,10 +137,9 @@ class PlotlyDraw(object):
             if 'graph' not in d:
                 #assert type(d['args'])==dict,'query argument:args'
                 if d['graph_type']=='scatter':
-                    
-                    d['graph'] = self.scatter(x=d['x'],y=d['y'])
+                    d['graph'] = self.scatter(x=d['x'],y=d['y'],name=d['name'])
                 elif d['graph_type']=='bar':
-                    d['graph'] = self.bar(x=d['x'],y=d['y'])
+                    d['graph'] = self.bar(x=d['x'],y=d['y'],name=d['name'])
 
             self._config['layout']['xaxis{}'.format(ix + 1)] = self._config['axis']
             self._config['layout']['yaxis{}'.format(ix + 1)] = self._config['axis']

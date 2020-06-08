@@ -60,29 +60,24 @@ class Dispose(object):
     def _window_data(self,data,idx,window=5):
         """求出idx附近可用的值
         args:
-        data:1d;
+        data:1d;要求是pd.DataFrame()数据。
         idx:select index;
         window:idx left。idx right。
         """
-        val = []
-        val.extend(data[idx - window:idx])
-        val.extend(data[idx + 1:idx + window])
-
-        # 选到的值及索引。
-        save = []
-        idxs = []
-
-        for i,v in enumerate(val):
-            try:
-                ni = list(v)
-            except:
-                ni = v
-            if ni in self.miss_val:
-                continue
-            else:
-                save.append(ni)
-                idxs.append(i)
-        return save,idxs
+        if idx >= window:
+            _ix1 = idx - window
+        else:
+            _ix1 = 0
+            
+        if len(data) <= (idx + window):
+            _ix2 = len(data)
+        else:
+            _ix2 = idx + window
+        
+        _ixs = list(range(_ix1,idx)) + list(range(idx+1,_ix2))
+        _val = data[_ixs][data.notnull()]
+        
+        return _val,_val.index
 
     def _mean(self,data):
         """用来计算指定数据的均值。
@@ -168,58 +163,63 @@ class Dispose(object):
         x:[1,2,3,4,5]#np.ndarry()
         """
         from scipy.interpolate import lagrange
-        
-        _list_val = list(x.values)
-        miss_idx = self.search_miss(_list_val)
-        
+
+        miss_idx = list(x[x.isnull()].index)
+
         for val in miss_idx:
             # 查找缺失值附近可用的值。
-            _apply_data,idxs = self._window_data(_list_val,val,window=100)
+            _apply_data,idxs = self._window_data(x,val,window=50)
             #判断插值方法,mean:使用缺失值附近的数据的均值代替
             if method=='mean':
                 res = self._mean(_apply_data)
             elif method=='lagrange':
                 res = lagrange(idxs,_apply_data)(val)
+
+            x[val] = res
             
-            x[:][val] = res
-        
+        assert len(x[x.isnull()])==0,'exist None'
         return x
     
-    def _multi_var_interpolate(self,dt,use_columns,target,method="knn"):
+    def _multi_var_interpolate(self,dt,use_columns,target,method="cknn"):
         """多变量插补,要求其它维特征没有缺失值。
         x：可以是1d或2d。
         y：要插值的特征列。
         """
-        from sklearn.neighbors import KNeighborsClassifier
+        from sklearn.neighbors import KNeighborsClassifier,KNeighborsRegressor
         
         assert isinstance(dt, pd.core.frame.DataFrame),'dt must be pd.core.frame.DataFrame'
 
-        # 对一维数据做了扩维处理
-        if len(use_columns)==1:
-            __x = [[0,i] for i in dt[use_columns[0]]]
-            dt[use_columns[0]] = __x
-            #_x = pd.DataFrame({_x.columns[0]:__x})
- 
         #选出拟合用的数据
         _fit_indexs = list(dt[target][dt[target].notnull()].index)
         _none_indexs = list(dt[target][dt[target].isnull()].index)
-
-        _fitx = dt.loc[_fit_indexs][use_columns].values
+        
+        # 对一维数据做了扩维处理
+        if len(use_columns)==1:
+            __x = [[0,i] for i in dt[use_columns[0]][_fit_indexs]]
+            _fitx = __x
+            _predx = [[0,j] for j in dt[use_columns[0]][_none_indexs]]
+            assert len(_predx)>0,'no None'
+        else:
+            _fitx = dt.loc[_fit_indexs][use_columns].values
+            _predx = dt.loc[_none_indexs][use_columns].values
+            
         _fity = dt.loc[_fit_indexs][target].values
-        
-        assert None not in _fitx,'_fitx exist None'
-        assert None not in _fity,'_fity exist None'
-        
-        if method=='knn':
+        assert len(_fitx)==len(_fity),'x no same len than y.'
+
+        if method=='cknn':
             # 最近邻分类插值。
-            c_knn=KNeighborsClassifier(n_neighbors=3,#返回候选个数
+            _knn = KNeighborsClassifier(n_neighbors=3,#返回候选个数
                         algorithm='auto',
                         leaf_size=30,
                         weights='uniform')
-            c_knn.fit(_fitx,_fity)
-            _pred = c_knn.predict(dt.loc[_none_indexs][use_columns].values)
+        elif method=='rknn':
+            _knn = KNeighborsRegressor(n_neighbors=2,algorithm='auto',weights='uniform')
+            
+        _knn.fit(_fitx,_fity)
+        _pred = _knn.predict(_predx)
         
-        dt.loc[_none_indexs][target] = _pred
+        dt[target][_none_indexs] = _pred
+
         # 返回目标列插值结果。
         return dt
 
@@ -245,37 +245,143 @@ class Dispose(object):
         
         return _res
     
-    #数据规范化
-    def norm_data(self,data,query_shape,method='norm'):
-        shape = np.shape(data)
-        take_data = []
-        dt = np.reshape(data,query_shape)
+    
+    def norm_data(self,data,algorithm='norm'):
+        #数据规范化,dt:2d
+        dt = np.array(list(data))
+        shape = np.shape(dt)
+        _custom = True if algorithm[0:2]=='u-' else False 
+        
+        if _custom==False and len(shape)<=1:
+            raise ValueError('query 2d data')
 
-        if method=='norm':
+
+        if algorithm=='norm':
             scaler = preprocessing.normalize
-        elif method=='max-min':
+        elif algorithm=='max-min':
+            # 最大最小归一化
             scaler = preprocessing.MinMaxScaler()
-        elif method=='qt':
+        elif algorithm=='qt':
             scaler = preprocessing.QuantileTransformer()
-        elif method=='mas':
+        elif algorithm=='max':
+            # 最大绝对值归一化
             scaler = preprocessing.MaxAbsScaler()
-
-        #可批量归一化数据
-        if len(shape)>2:
-            for d in dt:
-                if method=='norm':
-                    take_data.append(scaler(d,norm='l2'))
-                else:
-                    take_data.append(scaler.fit_transform(d))
+        elif algorithm=='stand':
+            # 减均值，比方差
+            scaler = preprocessing.StandardScaler()
+        elif algorithm=='u-max':
+            # 自定义，最大规范化，规范到-1~1之间，这里应该改为求dt中每个值的绝对值的最大值
+            _max = abs(np.max(dt))
+            _res = dt / _max
+        elif algorithm=='u-max-min':
+            # 自定义最大最小归一化，规范到0~1之间
+            _max = np.max(dt)
+            _min = np.min(dt)
+            _res = (dt - _min) / (_max - _min)
+        elif algorithm=='u-stand':
+            # 自定义中心标准化，适合数据稳定，变化不大的情况。
+            _mean = np.mean(dt)
+            _var = np.std(dt)
+            _res = (dt - _mean) / _var
+        elif algorithm=='decimal':
+            # 自定义小数规范化，规范到0~1之间
+            _q = np.log10(dt.max())
+            _res = dt / np.power(10,_q)
+        
+        if _custom==True:
+            return _res
         else:
-            d = dt
-            if method=='norm':
-                take_data = scaler(d,norm='l2')
-            else:
-                take_data = scaler.fit_transform(d)
-        #还原数据形状
-        res_data = np.reshape(take_data,shape)
-        return res_data
+            take_data = scaler.fit_transform(dt)
+            return take_data
+    
+    def _mean_poor(self,xs):
+        # 计算平均差值,xs:1d
+        _mean = np.mean(xs)
+        _std = 0
+        for j in xs:
+            _std += abs(j - _mean)
+        _npx = np.sort(xs)
+        return (_std / len(xs),_npx[-1] - _npx[0])
+        
+    def discrete(self,dt,algorithm='auto',n_class=None,scope_val=None,mean_multip=1.2,replace='label'):
+        """对数据进行离散化
+        args:
+        dt:1d;
+        algorithm: auto(自动适应),scope(指定范围值划分);
+        scope_val: algorithm为scope时使用，指定划分区域，如[5,10,20]=>(x<5,5<=x<10,10<=x<20)
+        mean_multip: 与衡量子样的值相乘，值偏小可以细分群体。
+        """
+        assert len(np.shape(dt))==1,'query data 1d'
+        _copy_data = dt.copy()
+        _class_dict = dict()
+        _class_index = 0
+        _sort = np.sort(dt)
+        _res = []
+        
+        def _class_val(_x):
+            _q = False
+            for d in _class_dict:
+                if _x in _class_dict[d]:
+                    _q = d
+                else:
+                    continue
+            return _q
+        
+        def _division():
+            # 查找对应值所在的类
+            for c in dt:
+                _val = _class_val(c)
+                if _val==False:
+                    raise ValueError('{} not in scope_val'.format(c))
+                # 判断用什么值来取代该值。
+                if replace=='label':
+                    _res.append(int(_val))
+                elif replace=='max':
+                    _res.append(np.max(_class_dict[_val]))
+                elif replace=='min':
+                    _res.append(np.min(_class_dict[_val]))
+                elif replace=='mean':
+                    _res.append(np.mean(_class_dict[_val]))
+                else:
+                    raise ValueError('{} is dont support function'.format(replace))
+        
+        
+        if algorithm=='auto':
+            _before_index = 0
+            _before_distant = _sort[1] - _sort[0]
+            
+            for i in range(1,len(_sort)):
+                _div = _sort[i] - _sort[i - 1]
+                
+                # 若当前值与上一个值之差大于mean_multip * _before_distant，则将之前的值聚为一类。
+                if _div >= (mean_multip * _before_distant):
+                    od = self._mean_poor(_sort[_before_index:i])[1]
+                    if od < _div:
+                        _class_dict[str(_class_index)] = _sort[_before_index:i]
+                        _before_index = i
+                        _class_index += 1
+                    
+                _before_distant = _div
+            
+            _class_dict[str(_class_index)] = _sort[_before_index:]
+
+        elif algorithm=='scope':
+            # 指定具体的阈值来划分
+            assert scope_val!=None,'query scope_val'
+            _scope = np.sort(scope_val)
+            _pd_val = pd.DataFrame({'a':dt})
+            for i,c in enumerate(_scope):
+                if i==0:
+                    _class_dict[str(_class_index)] = list(_pd_val['a'][_pd_val['a']<=c].values)
+                else:
+                    _class_dict[str(_class_index)] = list(_pd_val['a'][(_pd_val['a']>_scope[i-1])&(_pd_val['a']<=c)].values)
+                _class_index += 1
+        # 开始离散化
+        _division()
+        _classes = [int(i) for i in _class_dict]       
+        return (_res,_classes)
+
+
 
 
 #   数据探索性分析
@@ -376,20 +482,6 @@ class DataExplorAnalysis(object):
         _columns = columns if columns!=None else self._columns
 
         _infos = dict()
-        
-        for c in _columns:
-            print("#####\t{}:".format(c))
-            print('数据条数:\t{}'.format(self._info[c]['count']))
-            print('最大值:\t{}'.format(self._info[c]['max']))
-            print('最小值:\t{}'.format(self._info[c]['min']))
-            print('均值:\t{}'.format(self._info[c]['mean']))
-            _deviateTip = "负偏态，大值多在右侧" if self._info[c]['deviate'] <0 else "正偏态，大值多在左侧"
-            _kurtosisTip = "不是正太分布" if abs(self._info[c]['kurtosis'] - 3) >2 else "近似正太分布"
-            print('偏态系数:\t{}({})'.format(self._info[c]['deviate'],_deviateTip))
-            print('峰态系数:\t{}({})'.format(self._info[c]['kurtosis'],_kurtosisTip))
-            print('中位数:\t{}'.format(self._info[c]['median']))
-            print('众数:\t{}'.format(self._info[c]['mode']))
-
 
         for c in _columns:
             _deviateTip = "负偏态，大值多在右侧" if self._info[c]['deviate']<0 else "正偏态，大值多在左侧"
@@ -410,7 +502,8 @@ class DataExplorAnalysis(object):
                          self._info[c]['median'],
                          self._info[c]['mode'],
                          _tip,
-                         self._info[c]['count']]
+                         self._info[c]['count'],
+                         self._info[c]['var']]
             
             if is_print==True:
                 print("#####\t{}:".format(c))
@@ -426,9 +519,9 @@ class DataExplorAnalysis(object):
                 
                 print('正态性检验结果:\t' + _tip + '\n')
             
-            if save==True:
-                _data_info = pd.DataFrame(_infos,index=['最大值','最小值','均值','偏态系数','峰态系数','中位数','众数','正态性','数据量'])
-                _data_info.to_csv(filename)
+        if save==True:
+            _data_info = pd.DataFrame(_infos,index=['最大值','最小值','均值','偏态系数','峰态系数','中位数','众数','正态性','数据量','方差'])
+            _data_info.to_csv(filename)
 
             
 
@@ -494,16 +587,101 @@ class DataExplorAnalysis(object):
                     if _fn[0]==None:
                         self._relationArray[a,b] = None
                     elif len(_fn)==1:
+                        #c = _model.calc(self._data[f1],self._data[f2],fn_str=_fn[0])
+                        #print('c===>>>',c)
                         self._relationArray[a,b] = _model.calc(self._data[f1],self._data[f2],fn_str=_fn[0])
                     else:
-                        self._relationArray[a,b] = 0.6 * _model.calc(self._data[f1],self._data[f2],fn_str=_fn[0]) + \
+                        _q = 0.6 * _model.calc(self._data[f1],self._data[f2],fn_str=_fn[0]) + \
                                                      0.4 * _model.calc(self._data[f1],self._data[f2],fn_str=_fn[1])
+
+                        self._relationArray[a,b] = _q
+                                                     
         _save_data = pd.DataFrame(self._relationArray,columns=_columns,index=_columns)
         if save==True:
             _save_data.to_csv(save_path)
 
         return _save_data
 
+
+
+class DimentionReduce(object):
+    _DESCRIBE = '降维分析'
+    def __init__(self):
+        self._config = {
+            "pca":{
+                'n_components':'mle',
+                'svd_solver':'auto'
+            },
+            "rsvd":{
+                'flip_sign':False,
+                'n_components':4,
+                'random_state':None
+            },
+            "tsvd":{
+                'n_components':4
+            }
+        }
+    
+    def rough(self,dt,target,move=True,columns=None):
+        """粗糙集算法
+        args:
+        dt: pandas数据；
+        target: 预测列；
+        columns: 用于做考虑范围的特征项；
+        move: 是否去除第一次检测到的重复项非target。
+        """
+        assert type(dt)==pd.core.frame.DataFrame,'dt must be pd.core.frame.DataFrame'
+        _feature_dict = dict()
+        TOTAL_ITEM = len(dt.index)
+        # 先取出所有重复的行
+        dt.drop_duplicates(inplace=True)
+        _columns = columns or dt.columns
+        _columns.remove(target)
+        # 除target列外还有重复的列
+        _repeat_index = dt[_columns][dt[_columns].duplicated()].index
+        # 用于研究的行
+        _g_index = list(set(dt.index) - set(_repeat_index))
+        
+        # 计算没个属性的重要性
+        def _calc_repeat(val):
+            kc = list(_columns).copy()
+            kc.remove(val)
+            # 不能区分的条数
+            can_use = dt[kc][dt[kc].duplicated()].index
+            _feature_dict[val] = len(can_use) / TOTAL_ITEM
+        
+        _n_column = _columns.copy()
+        for c in _columns:
+            _calc_repeat(c)
+        
+        if move==True:
+            d = dt.drop(index=_repeat_index)
+            d.reset_index()
+        
+        return _feature_dict
+        
+    def excellentScale(self):
+        # 最优尺度分析
+        pass
+    
+    def reduce(self,x,algorithm='pca',n_components='mle'):
+        from sklearn.decomposition import PCA,FactorAnalysis,TruncatedSVD,randomized_svd
+        
+        if algorithm=='pca':
+            _method = PCA(n_components=n_components,copy=True,svd_solver='auto')
+            _res = _method.fit_transform(x)
+        elif algorithm=='factor':
+            # 因子分析
+            _method = FactorAnalysis(n_components=n_components)
+            _res = _method.fit_transform(x)
+        elif algorithm=='rsvd':
+            _res = randomized_svd(M=x,n_components=4)
+        elif algorithm=='tsvd':
+            _method = TruncatedSVD(n_components=3,n_iter=4)
+            _res = _method.fit_transform(x)
+        
+        return _res
+        
 
 
 
@@ -543,7 +721,7 @@ class Nlp_data(object):
     @converse_res.setter
     def converse_res(self,val):
         self.words_to_id_res = val      
-   
+
     # 分词、去除停用词、返回词列表，传入一段文字
     def word_cut(self,text,typ='cn',file_path=r'/home/wcs/item/selfTool/resource/cn_stop.txt',stop=False):
       """args:
