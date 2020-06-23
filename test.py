@@ -110,7 +110,7 @@ from sklearn.tree import DecisionTreeRegressor
 
 """
 df = pd.DataFrame({
-    "A":ss.norm.rvs(size=10),
+    "A":ss.norm.rvs(size=10) ,
     "B":ss.norm.rvs(size=10),
     "C":ss.norm.rvs(size=10),
     "D":np.random.randint(low=0,high=2,size=10)})
@@ -126,6 +126,7 @@ rfe.fit_transform(x,y)
 
 sfm = SelectFromModel(estimator=DecisionTreeRegressor(),threshold=0.1)
 """
+
 x = pd.DataFrame({"a":[1.0,2,4,0,9,1.0],"b":[1.0,0,0,7,6,1],"c":[1.0,2,7,5.3,4.1,1.0]})
 
 from sklearn.preprocessing import *
@@ -137,19 +138,10 @@ ux = [[12, 57.2,  153.8],
 vx = [[0.1,1.2,1.3,4.5,6,10.2,11.5, 50.2,66.7,90.8,100.5,110]]
 
 cc = np.array([8.3,2.1,5.4,9.0,0.5,0.1,0.23,1.45,6.0,7.1,2.2])
-p = cc * 10
-print(p)
-print(np.log(p))
-"""
-import tensorflow as tf
-
-x = tf.constant([1,2,3])
-y = tf.constant([4,5,6])
-
-with tf.device('/gpu:0'):
-    z = x + y
-s = tf.Session()
-print(s.run(z))
-"""
-
-
+from sklearn.model_selection import KFold
+kf = KFold(5, True, 10)
+ 
+X = [1,2,3,4,5,6,6,7,8,9,9,2,3,5,45,24,33,54,54,36,2,1,4.0]
+for train_index, test_index in kf.split(X):
+    print('训练集:{}'.format(train_index))
+    print('测试集:{}'.format(test_index))
