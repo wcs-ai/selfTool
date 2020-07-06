@@ -9,25 +9,39 @@ import re
 
 #多线程基类
 class _Multi_process(threading.Thread):
-    def __init__(self):
+    def __init__(self,fn,arg,name='thread'):
+        """
+        fn:要运行的参数；
+        arg:要传给fn的参数，是一个整体。
+        """
         threading.Thread.__init__(self)
-        self.result = ''
-        self.ord = 0
+        self._fn = fn
+        self._arg = arg
+        self._name = name
 
     def run(self):
-        self.ord += 1
+        print("{} is starte>>>".format(self._name))
+        self._fn(self._arg)
 
 
 #使用多线程的类
 class MP(object):
-    def __init__(self, num):
+    def __init__(self, fns,args):
+        import queue
         self._threads = []
-        self._num = num
+        self._num = len(fns)
+        # 创建队列
+        self.fnQueue = queue.Queue(self._num)
+        self.argQueue = queue.Queue(self._num)
+        
+        for i,j in zip(fns,args):
+            self.fnQueue.put(i)
+            self.argQueue.put(j)
 
     #使用时在start和stop间添加自己想要运行的程序。
     def start(self):
         for i in range(self._num):
-            self._threads.append(_Multi_process())
+            self._threads.append(_Multi_process(self.fnQueue.get(),self.argQueue.get(),name='thread{}'.format(i)))
             self._threads[i].start()
 
     def stop(self):

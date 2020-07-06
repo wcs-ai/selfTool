@@ -3,7 +3,7 @@ sys.stdout=io.TextIOWrapper(sys.stdout.buffer,encoding='utf-8')
 
 class Tree(object):
     def __init__(self):
-        """
+        """统一使用三叉链表来存储树。
         每个元素是一个节点表示，分别为：双亲节点指针域、数据域、节点指针域(可以有多个)。
         保证第一个节点是头指针。
         _saveArea:[[parent,{id:1,name:'a',...},node1,node2,...],[],[],...]
@@ -76,7 +76,7 @@ class Tree(object):
         else:
             return False
         
-    def _ordTree(self,nodes,keyVal):
+    def _rankTree(self,nodes,keyVal):
         """# 构建二叉排序树
         nodes:[{name:1,val:5},{},...]
         key:指定用该键值比较各节点大小
@@ -97,9 +97,22 @@ class Tree(object):
             else:
                 # 以后改进一下
                 self._add(c,0,keyVal)
+    
+    def _ordTree(self):
+        pass
                 
         
-        
+def objInclude(a,b):
+    # 对象a是否在b中
+    _in = True
+    assert type(a)==type(b),'expected equal data type'
+    
+    for i in a:
+        if i not in b:
+            _in = False
+        else:
+            continue
+    return _in
         
          
         

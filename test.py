@@ -97,51 +97,44 @@ for i in jk:
     #print(i)
     print(i.start_node['name'],i.end_node['name'],dict(i))
 """
-
-
-###         特征选择
-from sklearn.feature_selection import SelectKBest,RFE,SelectFromModel
+import math
+from mysql import connector
+import pymysql
 import pandas as pd
-import scipy.stats as ss
-import numpy as np
-from sklearn.svm import SVR
-from sklearn.tree import DecisionTreeRegressor
+#打开数据库连接
+dt = pd.read_csv(r'E:\data\kaggleCompetitive/trend.csv')
+dat = pd.concat([pd.DataFrame({"id":list(dt.index)}),dt],axis=1)
+kc = pymysql.connect(
+    host="localhost",
+    user="root",
+    password="xsww",
+    database="wcs",
+    charset="utf8")
 
+ac = kc.cursor()
+
+sql = "INSERT INTO test (id,shop_id,item_id,month,mount) VALUES (%d,%d,%d,%d,%d)"
+"""
+ary = dat[['id','shop_id','item_id','month','mount']].values[0:1000]
+
+for i in ary[10:]:
+    um = []
+    for c in i:
+        um.append(int(c))
+    
+    uq = sql%tuple(um)
+    ac.execute(uq)
+
+kc.commit()
+"""
+m = ac.execute("SELECT DISTINCT shop_id FROM test")
 
 """
-df = pd.DataFrame({
-    "A":ss.norm.rvs(size=10) ,
-    "B":ss.norm.rvs(size=10),
-    "C":ss.norm.rvs(size=10),
-    "D":np.random.randint(low=0,high=2,size=10)})
-
-x = df.loc[:,["A","B","C"]]
-y = df.loc[:,["D"]]
-skb = SelectKBest(k=2)
-skb.fit(x,y)
-m = skb.transform(x)
-
-rfe = RFE(estimator=SVR(kernel="linear"),n_features_to_select=2,step=1)#step是每次迭代减少的特征数
-rfe.fit_transform(x,y)
-
-sfm = SelectFromModel(estimator=DecisionTreeRegressor(),threshold=0.1)
+res = ac.execute("SELECT shop_id FROM test")
+ret1 = ac.fetchone()  # 取一条
+ret2 = ac.fetchmany(3)  # 取三条
+ret3 = ac.fetchone()  # 取一条
+print(ret1)
+print(ret2)
+print(ret3)
 """
-
-x = pd.DataFrame({"a":[1.0,2,4,0,9,1.0],"b":[1.0,0,0,7,6,1],"c":[1.0,2,7,5.3,4.1,1.0]})
-
-from sklearn.preprocessing import *
-
-ux = [[12, 57.2,  153.8],
-    [0,  8,  2],
-    [5.1,  7.2, -8.9]]
-
-vx = [[0.1,1.2,1.3,4.5,6,10.2,11.5, 50.2,66.7,90.8,100.5,110]]
-
-cc = np.array([8.3,2.1,5.4,9.0,0.5,0.1,0.23,1.45,6.0,7.1,2.2])
-from sklearn.model_selection import KFold
-kf = KFold(5, True, 10)
- 
-X = [1,2,3,4,5,6,6,7,8,9,9,2,3,5,45,24,33,54,54,36,2,1,4.0]
-for train_index, test_index in kf.split(X):
-    print('训练集:{}'.format(train_index))
-    print('测试集:{}'.format(test_index))

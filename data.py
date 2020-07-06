@@ -195,9 +195,10 @@ class Dispose(object):
         
         # 对一维数据做了扩维处理
         if len(use_columns)==1:
-            __x = [[0,i] for i in dt[use_columns[0]][_fit_indexs]]
-            _fitx = __x
-            _predx = [[0,j] for j in dt[use_columns[0]][_none_indexs]]
+            #__x = [[0,i] for i in ]
+            _fitx = np.reshape(dt[use_columns[0]][_fit_indexs],(-1,1))
+            #_predx = [[0,j] for j in ]
+            _predx = np.reshape(dt[use_columns[0]][_none_indexs],(-1,1))
             assert len(_predx)>0,'no None'
         else:
             _fitx = dt.loc[_fit_indexs][use_columns].values
