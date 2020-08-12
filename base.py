@@ -1,5 +1,7 @@
 import sys,io
+import numpy as np
 sys.stdout=io.TextIOWrapper(sys.stdout.buffer,encoding='utf-8')
+
 
 class Tree(object):
     def __init__(self):
@@ -11,7 +13,7 @@ class Tree(object):
         self._tree = []
         self._header = 0
         self._valKey = 'val'
-        pass
+
     
     def _search(self,nid):
         """按照节点id查找节点所在路径"""
@@ -22,7 +24,7 @@ class Tree(object):
         
         return _address
                 
-    
+     
     def _update(self,node):
         """
         从上而下的更新树：父亲节点id，当前节点数据域、是第几个子节点(从左往右)。
@@ -114,6 +116,18 @@ def objInclude(a,b):
             continue
     return _in
         
-         
+
+
+def meanError(array,matrix=None):
+    # 计算数组array的平均差。
+    assert len(array)>0,'empty data'
+    s = 0
+    if matrix==None:
+        _mean = np.mean(array)
         
-        
+        for i in array:
+           s += abs(i - _mean)
+    else:
+        pass
+    
+    return s / len(array)

@@ -3,7 +3,7 @@
 from sklearn.naive_bayes import MultinomialNB, GaussianNB, BernoulliNB, ComplementNB
 from sklearn.utils import _joblib
 from sklearn.cluster import KMeans, MiniBatchKMeans
-from selfTool import file, data
+from selfTool import _file
 import decimal
 from scipy.stats import pearsonr, spearmanr, kendalltau
 import numpy as np
@@ -94,12 +94,12 @@ class Layer_kmeans(object):
             key1 = 'file' + str(idx)
             save_path = 'data/tree' + str(idx) + '.json'
             _kmeans_tree['festival'][key1] = save_path
-            file.op_file(file_path=save_path,
+            _file.op_file(file_path=save_path,
                          data=class_data[key1], model='json', method='save')
             # 保存后删除
             del class_data[key1]
         # 存储根节点查找文件
-        file.op_file(file_path='data/root.json',
+        _file.op_file(file_path='data/root.json',
                      data=_kmeans_tree, model='json', method='save')
 
     # 处理腾讯的9个词向量文件
@@ -119,7 +119,7 @@ class Layer_kmeans(object):
             key = 'tree' + str(f)
 
             f_p = 'data/tencent/tree' + str(f) + '.json'
-            file_tree[key] = file.op_file(f_p, method='read')
+            file_tree[key] = _file.op_file(f_p, method='read')
 
             vals = list(file_tree[key].values())
             ks = list(file_tree[key].keys())
@@ -141,7 +141,7 @@ class Layer_kmeans(object):
         self._clust_len = len(self._cluster) - 1
         self._basic_cluster(data, keys, self._cluster_tree, 0)
 
-        file.op_file(file_path=save_path, data=self._cluster_tree,
+        _file.op_file(file_path=save_path, data=self._cluster_tree,
                      model='json', method='save')
         """
 		***存储的数据结构：
@@ -205,7 +205,7 @@ class Layer_kmeans(object):
 
     # 从腾讯词向量中查找相似
     def search_tencent(self, dts, root_path, branchs=2, candidate=1, distance=3):
-        root = file.op_file(root_path, method='read')
+        root = _file.op_file(root_path, method='read')
         dist = {}
         for idx, i in enumerate(root['center_point']):
             val = data.point_distance(dts, i)
@@ -235,7 +235,7 @@ class Layer_kmeans(object):
         self._search_branch = branchs
         self._search_result = []
 
-        result = file.op_file(file_path, model='json', method='read')
+        result = _file.op_file(file_path, model='json', method='read')
         self.search_tree(data, result)
 
         sr = [c for c in sorted(self._search_result,
@@ -465,9 +465,13 @@ class Apriori(object):
 
 
 class TimeOrd(object):
+    """
+    自制：
+    描述不明确的波动数据，计算其下一期可能增大或减小的可能性。-表示减，正值表示增。
+    """
     def __init__(self,dts):
         # dts:[1,6,3,...]
-        
+        assert len(dts)>0,print(dts)
         self._seqson = []
         self._dts = dts
         self._mean = np.mean(dts)
@@ -529,6 +533,9 @@ class TimeOrd(object):
     def norm(self):
         """不规则的时间序列。根据前几期的值，计算下一期减小或增大的可能性。
         为负表示继续减小的可能性，为正表示继续增大的可能性，其度量用它们的绝对值表示。
+        暂时没有考虑值之间的出现间隔！！
+        
+        可以用：val + val * trend得到的值与目标属性做一个皮尔逊系数检验，一般能得到不错的相关性。   o
         """
         trends = []
         # 计算前3加权斜率。
@@ -600,7 +607,41 @@ class TimeOrd(object):
         
         return trends
 
+    def timeDist(self,dts,window=5,qsort=False):
+        DLEN = len(dts)
+        assert DLEN>0,'empty data'
+
+        SMOOTH = 1.2
+        
+        if qsort:
+            dts = np.sort(dts)
+        
+        res_array = []
+        
+        for i in range(DLEN):
+            ix = 0 if i<window else i - window
+            # 前几次记录。
+            use_dt = dts[ix:i]
+            ulen = len(use_dt)
             
+            if ulen==0:
+                val = 0.01
+            elif ulen==1:
+                val = use_dt[0] / (max([dts[i] - use_dt[0],use_dt[0]]) * SMOOTH)
+            else:
+                dist_array = []
+                # 计算每两个相邻时间的差值。
+                for j in range(1,ulen):
+                    dist_array.append(use_dt[j] - use_dt[j-1])
+                
+                _mean = np.mean(dist_array)
+                # 距离上一次时间 / 平均记录时间。
+                val = (dts[i] - use_dt[-1] + 0.95) / (_mean + 1)
+                
+            res_array.append(val)
+            
+        return res_array
+
         
         
         

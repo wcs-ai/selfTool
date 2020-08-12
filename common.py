@@ -5,7 +5,10 @@ import queue, os
 import numpy as np
 import math, time
 import chardet,copy
-import re
+import re,logging
+
+logger = logging.getLogger()
+logging.basicConfig(level=logging.INFO)
 
 #多线程基类
 class _Multi_process(threading.Thread):
@@ -535,17 +538,23 @@ class Cord_programmer(object):
         self._end_time = 0
 
     def s_to_t(self, ts):
-        _h = math.floor(ts / 60)
-        _m = math.floor((ts % 60) / 60)
-        _s = math.floor((ts % 60) % 60)
-        return _h, _m, _s
+        # 剩余的秒数
+        _s = math.floor(ts % 60)
+        # 总分
+        _m = math.floor(ts / 60)
+        
+        _h = math.floor(_m / 60)
+        _min = math.floor(_m % 60)  # 剩余的分钟
+        
+        return _h, _min, _s
 
     def end(self):
         self._end_time = time.time()
+        # 总秒数。
         used_time = self._end_time - self._start_time
 
         h, m, s = self.s_to_t(used_time)
-        print(f'used=>{h} h-{m} m-{s} s,total_seconds:{used_time}')
+        logger.info('used=>{} h-{} m-{} s,total_seconds:{}'.format(h,m,s,used_time))
 
 
 
